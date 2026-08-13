@@ -7,7 +7,7 @@ import type {
   ScenePrefs,
   SceneSettings,
 } from '../types.ts';
-import { loadData, saveData, migrate, serialize, emptyData } from './storage.ts';
+import { loadData, saveData, migrate, serialize } from './storage.ts';
 import { normalizeHex } from '../util/color.ts';
 
 export const DEFAULT_SETTINGS: SceneSettings = {
@@ -103,10 +103,6 @@ export class AppStore {
         prefs.schemes.push(makeDefaultScheme(prefs.schemes.length));
       }
     }
-  }
-
-  get currentSceneKey(): string {
-    return this.sceneKey;
   }
 
   get scene(): ScenePrefs {
@@ -247,17 +243,6 @@ export class AppStore {
     }
     this.useScene(this.sceneKey);
     this.flush();
-  }
-
-  resetAll(): void {
-    this.data = emptyData();
-    this.useScene(this.sceneKey);
-    this.flush();
-  }
-
-  /** Raw access for tests. */
-  snapshot(): AppData {
-    return this.data;
   }
 }
 

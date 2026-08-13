@@ -117,10 +117,6 @@ export class Viewer {
     this.renderer.toneMapping = enabled ? ACESFilmicToneMapping : NoToneMapping;
   }
 
-  get toneMappingEnabled(): boolean {
-    return this.renderer.toneMapping !== NoToneMapping;
-  }
-
   setMaxPixelRatio(value: number): void {
     this.maxPixelRatio = value;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, value));
@@ -210,13 +206,5 @@ export class Viewer {
     this.renderer.setSize(width, height, false);
     this.renderer.render(this.scene, this.camera);
     return blob;
-  }
-
-  dispose(): void {
-    this.stop();
-    window.removeEventListener('resize', this.resize);
-    this.resizeObserver?.disconnect();
-    this.pmrem?.dispose();
-    this.renderer.dispose();
   }
 }
