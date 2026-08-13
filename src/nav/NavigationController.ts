@@ -1,22 +1,33 @@
-import { Box3, Vector3 } from 'three';
+import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
 import { WalkMotion } from './WalkMotion.ts';
 import type { CameraPose, NavMode } from '../types.ts';
-import type { Viewer } from '../core/Viewer.ts';
+
+/**
+ * The slice of the viewer that navigation needs: a camera to drive, and an
+ * element to listen on. Narrow enough that mode switching can be exercised
+ * without a renderer.
+ */
+export interface NavHost {
+  readonly camera: PerspectiveCamera;
+  readonly canvas: HTMLElement;
+}
 
 /**
  * Owns both navigation modes and the hand-off between them.
  *
- * Switching modes never teleports the camera: each controller adopts the other's
- * final transform, so `Tab` is a change of input scheme, not of viewpoint.
+ * A bare switch never teleports the camera: each controller adopts the other's
+ * final transform, so `Tab` is a change of input scheme, not of viewpoint. Only
+ * an explicit `restorePose` moves you — back to where you last stood in the
+ * mode you are entering.
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
   /** Walk-mode camera state: ask this what walk mode is doing, and tell it to move. */
   readonly walk: WalkMotion;
-  /** The listeners that drive `walk`. Public only for pointer lock. */
-  readonly walkInput: WalkControls;
+  /** The listeners that drive `walk`. Private — pointer lock is forwarded below. */
+  private readonly walkInput: WalkControls;
 
   private _mode: NavMode = 'orbit';
   private bounds: Box3 | null = null;
@@ -28,8 +39,8 @@ export class NavigationController {
   onModeChange: ((mode: NavMode) => void) | null = null;
   onPoseChange: ((mode: NavMode, pose: CameraPose) => void) | null = null;
 
-  constructor(private viewer: Viewer) {
-    this.orbit = new OrbitControls(viewer.camera, viewer.canvas);
+  constructor(private host: NavHost) {
+    this.orbit = new OrbitControls(host.camera, host.canvas);
     this.orbit.enableDamping = true;
     this.orbit.dampingFactor = 0.075;
     this.orbit.rotateSpeed = 0.55;
@@ -41,8 +52,8 @@ export class NavigationController {
     // Never orbit under the horizon of the target — keeps you out of the floor.
     this.orbit.maxPolarAngle = Math.PI / 2;
 
-    this.walk = new WalkMotion(viewer.camera);
-    this.walkInput = new WalkControls(this.walk, viewer.canvas);
+    this.walk = new WalkMotion(host.camera);
+    this.walkInput = new WalkControls(this.walk, host.canvas);
     this.walkInput.enabled = false;
 
     this.orbit.addEventListener('end', () => this.emitPose());
@@ -55,7 +66,15 @@ export class NavigationController {
     return this._mode;
   }
 
-  setMode(mode: NavMode): void {
+  /**
+   * Hands control to the other mode and settles the camera in one step.
+   *
+   * The incoming mode first adopts the outgoing one's transform; `restorePose`
+   * — where this mode was last left — then overrides it. Only the settled pose
+   * is emitted, so a switch never reports the transform carried over from the
+   * mode you just left.
+   */
+  switchMode(mode: NavMode, restorePose?: CameraPose | null): void {
     if (mode === this._mode) return;
     this._mode = mode;
 
@@ -65,21 +84,37 @@ export class NavigationController {
       // Stands at eye height where the camera already is — walk mode owns that
       // arithmetic, so it isn't repeated out here.
       this.walk.syncFromCamera();
-      this.viewer.canvas.classList.add('walk-mode');
+      this.host.canvas.classList.add('walk-mode');
     } else {
       this.walkInput.enabled = false;
       this.walkInput.exitPointerLock();
       this.orbit.enabled = true;
       // Put the orbit pivot a few metres ahead of where you were looking.
-      const forward = new Vector3(0, 0, -1).applyQuaternion(this.viewer.camera.quaternion);
-      this.orbit.target.copy(this.viewer.camera.position).addScaledVector(forward, 2.5);
+      const forward = new Vector3(0, 0, -1).applyQuaternion(this.host.camera.quaternion);
+      this.orbit.target.copy(this.host.camera.position).addScaledVector(forward, 2.5);
       this.orbit.update();
-      this.viewer.canvas.classList.remove('walk-mode');
+      this.host.canvas.classList.remove('walk-mode');
     }
 
     this.targetAnim = null;
+    if (restorePose) this.applyPose(restorePose);
     this.onModeChange?.(mode);
     this.emitPose();
+  }
+
+  // -------------------------------------------------------- pointer lock
+
+  /** No-op outside walk mode — orbit has no use for a captured pointer. */
+  requestPointerLock(): void {
+    this.walkInput.requestPointerLock();
+  }
+
+  exitPointerLock(): void {
+    this.walkInput.exitPointerLock();
+  }
+
+  get isPointerLocked(): boolean {
+    return this.walkInput.isPointerLocked;
   }
 
   // -------------------------------------------------------------- bounds
@@ -101,8 +136,8 @@ export class NavigationController {
     const position = new Vector3().fromArray(pose.position);
     const target = new Vector3().fromArray(pose.target);
 
-    this.viewer.camera.position.copy(position);
-    this.viewer.camera.lookAt(target);
+    this.host.camera.position.copy(position);
+    this.host.camera.lookAt(target);
 
     if (this._mode === 'walk') {
       this.walk.setPose(position, target);
@@ -114,7 +149,7 @@ export class NavigationController {
   }
 
   getPose(): CameraPose {
-    const position = this.viewer.camera.position.toArray() as [number, number, number];
+    const position = this.host.camera.position.toArray() as [number, number, number];
     const target =
       this._mode === 'walk'
         ? (this.walk.getTargetPoint().toArray() as [number, number, number])
@@ -146,7 +181,7 @@ export class NavigationController {
     if (this._mode === 'walk') {
       this.walk.setPose(eye, center);
     } else {
-      this.viewer.camera.position.copy(eye);
+      this.host.camera.position.copy(eye);
       this.orbit.target.copy(center);
       this.orbit.update();
     }
@@ -172,7 +207,7 @@ export class NavigationController {
       // Belt-and-braces floor clamp: panning can push the eye below the slab
       // even with maxPolarAngle limited.
       const minY = this.floorY + 0.08;
-      if (this.viewer.camera.position.y < minY) this.viewer.camera.position.y = minY;
+      if (this.host.camera.position.y < minY) this.host.camera.position.y = minY;
     } else {
       this.walk.update(dt);
     }
