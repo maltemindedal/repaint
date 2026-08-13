@@ -1,0 +1,131 @@
+# Baking lighting into a glTF export
+
+Blender's glTF exporter has **no lightmap slot**. This guide covers the way
+around it: bake to a second UV set, smuggle the bake out through the
+**occlusion** input, and let Repaint re-route it into three.js's `lightMap`.
+
+Baking is optional. A scene without one still works — it just relies on the
+exported punctual lights and the environment map instead.
+
+Assumes you have already read [Preparing a Blender scene](preparing-a-blender-scene.md).
+
+## 1. Make the lightmap UV layer
+
+For each object that should carry baked light:
+
+1. Select the object → **Object Data Properties** (green triangle) → **UV Maps**.
+2. Add a second UV map with **+**. Name it something consistent, e.g. `UVMap.001`
+   or `Lightmap`. Keep your original UV map **first in the list** — glTF exports
+   list order as `TEXCOORD_0`, `TEXCOORD_1`, …, and the app expects the bake on
+   `TEXCOORD_1`.
+3. With the new UV map selected (click its name so it is the active one), enter
+   Edit Mode, select all (<kbd>A</kbd>), then **UV → Smart UV Project**. An island
+   margin of `0.02`–`0.05` stops light bleeding between islands at low
+   resolutions.
+
+> Doing this for many objects: select them all, make the active object the one
+> you just set up, then **Object → Link/Transfer Data → Copy UV Maps**. Verify
+> per object afterwards — it only works cleanly for matching topology.
+
+## 2. Add the bake target image
+
+1. **Image Editor → New**. Name it `Bake_Living`, size 2048×2048, uncheck
+   **Alpha**, and check **32-bit Float** if you plan to bake to HDR and tone it
+   down later (otherwise leave it off).
+2. In each material, add an **Image Texture** node, point it at that image, and
+   **select the node but do not connect it**. Cycles bakes into whichever image
+   texture node is _active_ in the material.
+3. Set the node's UV source: add a **UV Map** node, set it to your lightmap UV
+   layer, and wire it into the image texture's `Vector`.
+
+## 3. Bake
+
+1. **Render Properties** → Render Engine **Cycles**.
+2. Scroll to **Bake**.
+3. Choose a **Bake Type**:
+
+   | Bake type                                                               | Result                                                                                                                      | Verdict                                                      |
+   | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+   | **Diffuse**, with **Direct + Indirect** checked and **Color unchecked** | Incoming light with no albedo, so the app can multiply your live paint colour by it                                         | ✅ **Recommended**                                           |
+   | **Combined**                                                            | Everything, including the wall's base colour — it bakes the _current_ paint into the texture, which fights with recolouring | Only if you set every paintable material to pure white first |
+   | **Ambient Occlusion**                                                   | Cheap and fast, no light direction                                                                                          | Fine for a first pass                                        |
+
+4. Set **Margin** ≈ 16 px.
+5. **Bake**. Save the image (`Image → Save As`, PNG or JPG) _and_ keep it packed
+   (`File → External Data → Pack Resources`) so it travels inside the `.glb`.
+
+## 4. Hook it up for export
+
+Principled BSDF has no occlusion input, so the glTF exporter reads the bake from
+a dedicated node group instead. Per the
+[Blender manual](https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html#baked-ambient-occlusion),
+it looks for a custom node group named `glTF Material Output` with an input
+named **`Occlusion`**.
+
+1. Enable **Preferences → Add-ons → Shader Editor Add-ons**. You then get the
+   node from **Add → Output → glTF Material Output**.
+2. Drop that node into every material carrying a bake, and wire your bake Image
+   Texture's **Color** output into its **`Occlusion`** input.
+3. Leave it otherwise unconnected — it never renders in Blender. It is metadata
+   the exporter reads.
+4. Set the bake Image Texture node's **Color Space** to **sRGB**.
+
+### Give the bake its own image
+
+glTF stores occlusion in the **red channel only**, so it can legally share one
+texture with roughness (green) and metallic (blue). If your material also has
+roughness/metallic image textures, the exporter may pack all three into one
+image — and then green and blue hold roughness and metallic, not light.
+
+The app detects this (the slots share a texture source), falls back to using the
+texture as plain ambient occlusion, and says so in the console. For real baked
+lighting, keep the bake as a standalone image and leave roughness and metallic as
+plain values.
+
+## What the app does with it on import
+
+For a standalone bake, Repaint:
+
+- takes the glTF occlusion texture (GLTFLoader puts it in `material.aoMap`),
+- flags it **sRGB** — a Cycles bake saved as PNG/JPG is sRGB-encoded, and reading
+  it as linear data would wash the room out,
+- assigns it to **`material.lightMap`**, which samples full RGB and multiplies
+  into diffuse irradiance, which is what baked light _is_,
+- and points `material.aoMap` at the **same texture instance** with
+  **`aoMapIntensity = 0`**.
+
+That last part is deliberate: feeding one texture into both slots at full
+strength multiplies the occlusion in twice and gives you muddy corners. Both
+intensities are sliders in the debug panel (<kbd>`</kbd>), so if you baked pure
+AO rather than diffuse light, push **AO intensity** up and **Lightmap intensity**
+down.
+
+For the reasoning in full, see
+[ADR 0002: smuggle the lightmap through the occlusion slot](../architecture/decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md).
+
+## Why the default lightmap intensity is π, not 1
+
+three.js adds the lightmap to `irradiance`, and `RE_IndirectDiffuse_Physical`
+then multiplies that by `BRDF_Lambert() = albedo / π`. A Cycles Diffuse or
+Combined bake already stores outgoing radiance for a white surface — the answer
+_before_ that division.
+
+Leaving the intensity at 1 makes the room come out π times too dark, which people
+usually compensate for by cranking exposure and wrecking the colours. Setting it
+to π puts the division back, so a bake value of "fully lit" renders as your paint
+colour at full brightness. The slider range is 0–6 if your bake was exposed
+differently.
+
+See [ADR 0003](../architecture/decisions/0003-default-lightmap-intensity-is-pi.md).
+
+## Troubleshooting a bake
+
+| Symptom                                                | Cause                                                 | Fix                                                                                                   |
+| ------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Room is uniformly dark                                 | Lightmap intensity at 1, or no bake detected          | Check `baked: yes` in the debug panel's Scene folder; raise **Lightmap intensity** toward π           |
+| Corners look muddy                                     | AO being multiplied in on top of a lightmap           | Set **AO intensity** to 0                                                                             |
+| Console warns about a shared ORM texture               | Bake packed with roughness/metallic                   | Re-export the bake as its own image                                                                   |
+| Console warns about `TEXCOORD_1` with no second UV set | Exporter promised a second UV set but didn't ship one | Re-export with the lightmap UV layer included — the app falls back to UV0 rather than rendering black |
+| Whole scene washed out                                 | Bake read as linear rather than sRGB                  | Set the bake Image Texture node's Color Space to sRGB and re-export                                   |
+
+More general problems: [Troubleshooting](troubleshooting.md).
