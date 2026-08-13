@@ -1,8 +1,17 @@
-import { Box3, MathUtils, Vector3 } from 'three';
+import { Box3, MathUtils, PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
 import type { CameraPose, NavMode } from '../types.ts';
-import type { Viewer } from '../core/Viewer.ts';
+
+/**
+ * The slice of the viewer that navigation needs: a camera to drive, and an
+ * element to listen on. Narrow enough that mode switching can be exercised
+ * without a renderer.
+ */
+export interface NavHost {
+  readonly camera: PerspectiveCamera;
+  readonly canvas: HTMLElement;
+}
 
 /**
  * Owns both navigation modes and the hand-off between them.
@@ -12,7 +21,7 @@ import type { Viewer } from '../core/Viewer.ts';
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
-  readonly walk: WalkControls;
+  private readonly walk: WalkControls;
 
   private _mode: NavMode = 'orbit';
   private bounds: Box3 | null = null;
@@ -24,7 +33,7 @@ export class NavigationController {
   onModeChange: ((mode: NavMode) => void) | null = null;
   onPoseChange: ((mode: NavMode, pose: CameraPose) => void) | null = null;
 
-  constructor(private viewer: Viewer) {
+  constructor(private viewer: NavHost) {
     this.orbit = new OrbitControls(viewer.camera, viewer.canvas);
     this.orbit.enableDamping = true;
     this.orbit.dampingFactor = 0.075;
@@ -50,7 +59,15 @@ export class NavigationController {
     return this._mode;
   }
 
-  setMode(mode: NavMode): void {
+  /**
+   * Hands control to the other mode and settles the camera in one step.
+   *
+   * The incoming mode first adopts the outgoing one's transform; `restorePose`
+   * — where this mode was last left — then overrides it. Only the settled pose
+   * is emitted, so a switch never reports the transform carried over from the
+   * mode you just left.
+   */
+  switchMode(mode: NavMode, restorePose?: CameraPose | null): void {
     if (mode === this._mode) return;
     this._mode = mode;
 
@@ -74,8 +91,24 @@ export class NavigationController {
     }
 
     this.targetAnim = null;
+    if (restorePose) this.applyPose(restorePose);
     this.onModeChange?.(mode);
     this.emitPose();
+  }
+
+  // -------------------------------------------------------- pointer lock
+
+  /** No-op outside walk mode — orbit has no use for a captured pointer. */
+  requestPointerLock(): void {
+    this.walk.requestPointerLock();
+  }
+
+  exitPointerLock(): void {
+    this.walk.exitPointerLock();
+  }
+
+  get isPointerLocked(): boolean {
+    return this.walk.isPointerLocked;
   }
 
   // -------------------------------------------------------------- bounds

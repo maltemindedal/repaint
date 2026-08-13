@@ -446,6 +446,7 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
+  navigation.test.ts       8 tests over mode switching and pose hand-off
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
