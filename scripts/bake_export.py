@@ -1,6 +1,6 @@
 """Bake lighting and export a Repaint-ready .glb from any .blend, headless.
 
-Automates the README's "Blender workflow" section end to end:
+Automates the Blender workflow from docs/guides/ end to end:
 
   1. converts bakeable meshes to plain meshes (applies modifiers, makes
      linked duplicates single-user so their lightmap UVs don't overlap),
@@ -12,16 +12,16 @@ Automates the README's "Blender workflow" section end to end:
      input (what the glTF exporter reads, and what the app re-routes into
      three.js's lightMap slot),
   5. bakes Diffuse / Direct+Indirect (Color off) with Cycles,
-  6. exports a .glb with the settings the README's table asks for
-     (cameras on, +Y up, apply modifiers, UVs, normals).
+  6. exports a .glb with the settings docs/guides/preparing-a-blender-scene.md
+     asks for (cameras on, +Y up, apply modifiers, UVs, normals).
 
 Usage:
 
   blender --background apartment.blend --python scripts/bake_export.py -- \
       --out apartment.glb [options]
 
-Run with `-- --help` for the option list, or see the README's
-"Or: automate steps 2-3 with a script" section.
+Run with `-- --help` for the option list, or see
+docs/guides/baking-lighting.md, "Automating this guide with a script".
 
 The source .blend is never saved — everything happens on the in-memory
 copy. Bake images are packed into the export and also written to
