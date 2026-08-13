@@ -182,7 +182,7 @@ class App {
       if (location.protocol === 'file:') {
         console.warn(
           '[load] Running from file:// — browsers block the DRACO/KTX2 decoder fetches there. ' +
-            'If this file is compressed, use the served build (npm run serve:dist).',
+            'If this file is compressed, use the served build (pnpm serve:dist).',
         );
       }
       this.panel.status(`Could not load ${file.name}. See the console for details.`, 6000);

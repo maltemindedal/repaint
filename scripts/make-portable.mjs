@@ -8,10 +8,10 @@
  *
  * One caveat, printed at the end: the DRACO and KTX2 decoders are WASM files
  * fetched on demand, and fetch() is blocked on file:// — so compressed GLBs
- * need the served build (`npm run serve:dist`). Uncompressed GLBs (Blender's
+ * need the served build (`pnpm serve:dist`). Uncompressed GLBs (Blender's
  * default export) and meshopt (bundled JS, no fetch) work fully.
  *
- * Run via `npm run build:portable` (which builds first).
+ * Run via `pnpm build:portable` (which builds first).
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -53,5 +53,5 @@ await writeFile(target, out);
 const mb = (Buffer.byteLength(out) / (1024 * 1024)).toFixed(1);
 console.log(`wrote ${target} (${mb} MB) — open it directly, no server needed.`);
 console.log(
-  'note: DRACO/KTX2-compressed GLBs cannot decode from file:// (WASM fetch is blocked); use `npm run serve:dist` for those.',
+  'note: DRACO/KTX2-compressed GLBs cannot decode from file:// (WASM fetch is blocked); use `pnpm serve:dist` for those.',
 );
