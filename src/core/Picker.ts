@@ -45,7 +45,6 @@ export class Picker {
   private pulse = new Map<string, number>();
   private scratch = new Color();
 
-  enabled = true;
   highlightsEnabled = true;
 
   onHover: ((target: PaintTarget | null) => void) | null = null;
@@ -130,7 +129,7 @@ export class Picker {
   };
 
   private handlePointerUp = (event: PointerEvent): void => {
-    if (!this.enabled || event.button !== 0) return;
+    if (event.button !== 0) return;
     // Ignore the pointerup that ends an orbit/look drag.
     const moved = Math.hypot(event.clientX - this.downAt.x, event.clientY - this.downAt.y);
     if (moved > 4) return;
@@ -142,7 +141,7 @@ export class Picker {
   };
 
   private handleDoubleClick = (event: MouseEvent): void => {
-    if (!this.enabled || !this.onDoubleClick) return;
+    if (!this.onDoubleClick) return;
     this.updatePointer(event);
     const hit = this.pickAny();
     if (hit) this.onDoubleClick(hit.point.clone());
@@ -211,7 +210,7 @@ export class Picker {
 
   /** Drive from the render loop. */
   update(dt: number): void {
-    if (this.dirty && this.enabled) {
+    if (this.dirty) {
       this.dirty = false;
       this.setHovered(this.pointerInside ? this.pickPaintable() : null);
     }
@@ -239,13 +238,5 @@ export class Picker {
       const wave = Math.abs(Math.sin(t * Math.PI * 2)) * t;
       this.applyEmissive(key, SELECT_PULSE * wave + HOVER_STRENGTH * (1 - t));
     }
-  }
-
-  dispose(): void {
-    const canvas = this.viewer.canvas;
-    canvas.removeEventListener('pointermove', this.handlePointerMove);
-    canvas.removeEventListener('pointerleave', this.handlePointerLeave);
-    canvas.removeEventListener('pointerdown', this.handlePointerDown);
-    canvas.removeEventListener('dblclick', this.handleDoubleClick);
   }
 }

@@ -1,4 +1,4 @@
-import { Box3, MathUtils, PerspectiveCamera, Vector3 } from 'three';
+import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
 import type { CameraPose, NavMode } from '../types.ts';
@@ -208,16 +208,18 @@ export class NavigationController {
     }
   }
 
+  // ------------------------------------------------------------ settings
+
+  // #6 deleted these as pure pass-throughs, on the grounds that callers could
+  // reach `walk` directly. They can't any more — the seam closed — so removing
+  // them now would push complexity back onto `App`, which is the test #6 set.
+  // The clamps stay where #6 put them, in WalkControls.
+
   setEyeHeight(value: number): void {
     this.walk.setEyeHeight(value);
   }
 
   setWalkSpeed(value: number): void {
-    this.walk.speed = MathUtils.clamp(value, 0.2, 20);
-  }
-
-  dispose(): void {
-    this.orbit.dispose();
-    this.walk.dispose();
+    this.walk.setSpeed(value);
   }
 }

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { NavigationController } from '../src/nav/NavigationController.ts';
 import type { CameraPose, NavMode } from '../src/types.ts';
@@ -68,13 +68,10 @@ const ORBIT_POSE: CameraPose = { position: [4, 2.1, 4], target: [0, 1, 0] };
 const WALK_POSE: CameraPose = { position: [-1, 1.65, 2], target: [-1, 1.65, -1] };
 const EYE_HEIGHT = 1.65;
 
-const live: NavigationController[] = [];
-
 function buildNav(startPose: CameraPose = ORBIT_POSE) {
   const canvas = new FakeCanvas();
   const camera = new PerspectiveCamera(60, 1.6, 0.1, 100);
   const nav = new NavigationController({ camera, canvas: canvas as unknown as HTMLElement });
-  live.push(nav);
   nav.setBounds(new Box3(new Vector3(-5, 0, -5), new Vector3(5, 2.6, 5)));
   nav.applyPose(startPose);
 
@@ -107,14 +104,12 @@ function pitchOf(pose: CameraPose): number {
 }
 
 beforeEach(() => {
+  // Controllers are never torn down — #6 deleted dispose() as untested fiction
+  // — so drop the listeners by hand; otherwise a controller from an earlier
+  // test still sees the next one's lock changes.
+  pointerLockListeners.clear();
   fakeDocument.pointerLockElement = null;
   fakeDocument.exitPointerLockCalls = 0;
-});
-
-afterEach(() => {
-  // Disposing also unhooks the pointer-lock listeners, so a controller from an
-  // earlier test can't see the next one's lock changes.
-  while (live.length > 0) live.pop()!.dispose();
 });
 
 describe('mode switching', () => {
