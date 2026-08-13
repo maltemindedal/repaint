@@ -32,11 +32,13 @@ export function disposeSubtree(root: Object3D): void {
 function readFile(file: File, onProgress: ProgressFn): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onprogress = (e) => {
+    reader.addEventListener('progress', (e) => {
       if (e.lengthComputable) onProgress((e.loaded / e.total) * 0.5, 'Reading file…');
-    };
-    reader.onload = () => resolve(reader.result as ArrayBuffer);
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
+    });
+    reader.addEventListener('load', () => resolve(reader.result as ArrayBuffer));
+    reader.addEventListener('error', () =>
+      reject(reader.error ?? new Error('Could not read file')),
+    );
     reader.readAsArrayBuffer(file);
   });
 }
@@ -87,8 +89,9 @@ export class SceneLoader {
     this.viewer.scene.add(root);
     this.current = root;
 
-    const used: string[] =
-      ((gltf.parser.json as { extensionsUsed?: string[] }).extensionsUsed ?? []).map(String);
+    const used = new Set(
+      ((gltf.parser.json as { extensionsUsed?: string[] }).extensionsUsed ?? []).map(String),
+    );
 
     const scene: LoadedScene = {
       root,
@@ -103,9 +106,9 @@ export class SceneLoader {
       hasBakedTextures: processed.bakedMaterials.length > 0,
       stats: {
         ...processed.stats,
-        draco: used.includes('KHR_draco_mesh_compression'),
-        meshopt: used.includes('EXT_meshopt_compression'),
-        ktx2: used.includes('KHR_texture_basisu'),
+        draco: used.has('KHR_draco_mesh_compression'),
+        meshopt: used.has('EXT_meshopt_compression'),
+        ktx2: used.has('KHR_texture_basisu'),
       },
       isFallback: false,
     };
@@ -120,7 +123,6 @@ export class SceneLoader {
     disposeSubtree(this.current);
     this.current = null;
   }
-
 }
 
 const MB = 1024 * 1024;
@@ -137,10 +139,10 @@ function logSceneReport(scene: LoadedScene, file: File): void {
   console.log(
     `dimensions: ${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m (assuming Blender metres, +Y up)`,
   );
-  console.log(`materials: ${stats.materials}, textures: ${stats.textures} (~${(stats.textureBytes / MB).toFixed(0)} MB VRAM)`);
   console.log(
-    `compression: draco=${stats.draco} meshopt=${stats.meshopt} ktx2=${stats.ktx2}`,
+    `materials: ${stats.materials}, textures: ${stats.textures} (~${(stats.textureBytes / MB).toFixed(0)} MB VRAM)`,
   );
+  console.log(`compression: draco=${stats.draco} meshopt=${stats.meshopt} ktx2=${stats.ktx2}`);
   console.log(`baked lighting detected: ${scene.hasBakedTextures}`);
   if (scene.startCam) console.log('START_CAM found — using it for the initial view.');
   if (scene.lights.length) console.log(`${scene.lights.length} punctual light(s) in the file.`);

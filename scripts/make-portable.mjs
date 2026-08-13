@@ -21,10 +21,14 @@ const dist = resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
 const html = await readFile(resolve(dist, 'index.html'), 'utf8');
 
 // The entry bundle and stylesheet as Vite wrote them into index.html.
-const scriptMatch = html.match(/<script type="module"[^>]*src="\.\/(assets\/[^"]+\.js)"[^>]*><\/script>/);
+const scriptMatch = html.match(
+  /<script type="module"[^>]*src="\.\/(assets\/[^"]+\.js)"[^>]*><\/script>/,
+);
 const styleMatch = html.match(/<link rel="stylesheet"[^>]*href="\.\/(assets\/[^"]+\.css)"[^>]*>/);
 if (!scriptMatch || !styleMatch) {
-  throw new Error('Could not find the entry script/stylesheet in dist/index.html — did the build run?');
+  throw new Error(
+    'Could not find the entry script/stylesheet in dist/index.html — did the build run?',
+  );
 }
 
 let js = await readFile(resolve(dist, scriptMatch[1]), 'utf8');

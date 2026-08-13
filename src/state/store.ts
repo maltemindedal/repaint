@@ -122,12 +122,8 @@ export class AppStore {
 
   setTagged(materialName: string, tagged: boolean, autoDiscovered: boolean): void {
     const prefs = this.scene;
-    const drop = (list: string[], name: string) => {
-      const i = list.indexOf(name);
-      if (i >= 0) list.splice(i, 1);
-    };
-    drop(prefs.tagged, materialName);
-    drop(prefs.untagged, materialName);
+    dropFrom(prefs.tagged, materialName);
+    dropFrom(prefs.untagged, materialName);
 
     // Only record the deviation from what discovery would do on its own, so a
     // re-export that adds the PAINT_ prefix doesn't leave stale overrides.
@@ -263,4 +259,9 @@ export class AppStore {
   snapshot(): AppData {
     return this.data;
   }
+}
+
+function dropFrom(list: string[], name: string): void {
+  const i = list.indexOf(name);
+  if (i >= 0) list.splice(i, 1);
 }

@@ -175,9 +175,9 @@ describe('colour pipeline', () => {
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
     expect(registry.get('PAINT_Living_North')!.currentHex).toBe('#abcdef');
-    expect(registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace)).toBe(
-      'abcdef',
-    );
+    expect(
+      registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace),
+    ).toBe('abcdef');
   });
 });
 

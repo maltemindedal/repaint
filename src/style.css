@@ -136,7 +136,9 @@ select {
   cursor: pointer;
   color: var(--g-400);
   letter-spacing: 0.02em;
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 
 .seg button:hover {
@@ -156,7 +158,10 @@ select {
   padding: 5px 10px;
   cursor: pointer;
   color: var(--g-300);
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
   white-space: nowrap;
 }
 
@@ -222,7 +227,9 @@ select {
   border-radius: var(--radius-sm);
   cursor: pointer;
   max-width: 150px;
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
 }
 
 .scheme-slot:hover {
@@ -791,7 +798,9 @@ input[type='checkbox'] {
   position: absolute;
   pointer-events: none;
   border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 .picker-cursor {

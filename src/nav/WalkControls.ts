@@ -185,9 +185,11 @@ export class WalkControls {
     this.yaw = MathUtils.lerp(this.yaw, this.targetYaw, lerp);
     this.pitch = MathUtils.lerp(this.pitch, this.targetPitch, lerp);
 
-    const forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
+    const forward =
+      Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
       Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
-    const strafe = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
+    const strafe =
+      Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
       Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
     const rise = Number(this.keys.has('KeyE')) - Number(this.keys.has('KeyQ'));
 
@@ -210,8 +212,16 @@ export class WalkControls {
 
     if (this.bounds) {
       const pad = 0.25;
-      this.position.x = MathUtils.clamp(this.position.x, this.bounds.min.x - pad, this.bounds.max.x + pad);
-      this.position.z = MathUtils.clamp(this.position.z, this.bounds.min.z - pad, this.bounds.max.z + pad);
+      this.position.x = MathUtils.clamp(
+        this.position.x,
+        this.bounds.min.x - pad,
+        this.bounds.max.x + pad,
+      );
+      this.position.z = MathUtils.clamp(
+        this.position.z,
+        this.bounds.min.z - pad,
+        this.bounds.max.z + pad,
+      );
       this.position.y = this.bounds.min.y + this.eyeHeight;
     } else {
       this.position.y = this.eyeHeight;
@@ -282,6 +292,14 @@ export class WalkControls {
 }
 
 const MOVE_CODES = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'KeyW',
+  'KeyA',
+  'KeyS',
+  'KeyD',
+  'KeyQ',
+  'KeyE',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
 ]);

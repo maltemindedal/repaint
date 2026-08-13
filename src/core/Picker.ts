@@ -38,7 +38,10 @@ export class Picker {
 
   private hovered: PaintTarget | null = null;
   /** key -> the materials being highlighted and the emissive they started with. */
-  private highlightState = new Map<string, { materials: MeshStandardMaterial[]; emissive: Color }>();
+  private highlightState = new Map<
+    string,
+    { materials: MeshStandardMaterial[]; emissive: Color }
+  >();
   private pulse = new Map<string, number>();
   private scratch = new Color();
 
@@ -220,8 +223,9 @@ export class Picker {
       this.applyEmissive(this.hovered.key, HOVER_STRENGTH);
     }
 
-    // Selection pulse decays back to the material's own emissive.
-    for (const [key, remaining] of [...this.pulse]) {
+    // Selection pulse decays back to the material's own emissive. (Deleting
+    // or updating existing keys mid-iteration is safe on a Map.)
+    for (const [key, remaining] of this.pulse) {
       const next = remaining - dt;
       if (next <= 0) {
         this.pulse.delete(key);

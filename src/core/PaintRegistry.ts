@@ -101,7 +101,7 @@ export class PaintRegistry {
   }
 
   list(): PaintTarget[] {
-    return [...this.targets.values()].sort((a, b) =>
+    return [...this.targets.values()].toSorted((a, b) =>
       a.displayName.localeCompare(b.displayName, undefined, { numeric: true }),
     );
   }
@@ -124,7 +124,7 @@ export class PaintRegistry {
         hasColorMap: group.hasColorMap,
         meshCount: group.meshes.length,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }
 
   /** Resolves a raycast hit back to the target that owns it. */
@@ -183,5 +183,4 @@ export class PaintRegistry {
     for (const [key, target] of this.targets) out[key] = target.currentHex;
     return out;
   }
-
 }

@@ -132,8 +132,7 @@ export class Sidebar {
       this.paintBody.appendChild(
         el('div', { class: 'sb-empty' }, [
           el('span', {
-            html:
-              'No <code>PAINT_</code> materials found. Open <b>All materials</b> below and tick the ones you want to repaint — the choice is remembered for this file.',
+            html: 'No <code>PAINT_</code> materials found. Open <b>All materials</b> below and tick the ones you want to repaint — the choice is remembered for this file.',
           }),
         ]),
       );
@@ -239,15 +238,16 @@ export class Sidebar {
   renderMaterials(materials: MaterialInfo[]): void {
     clear(this.materialsBody);
     if (materials.length === 0) {
-      this.materialsBody.appendChild(el('div', { class: 'sb-empty', text: 'No materials in the scene.' }));
+      this.materialsBody.appendChild(
+        el('div', { class: 'sb-empty', text: 'No materials in the scene.' }),
+      );
       return;
     }
 
     this.materialsBody.appendChild(
       el('div', {
         class: 'sb-empty',
-        html:
-          'Tick a material to make it repaintable. Tagging is stored per file name, so it survives a reload but not a rename.',
+        html: 'Tick a material to make it repaintable. Tagging is stored per file name, so it survives a reload but not a rename.',
       }),
     );
 
@@ -289,7 +289,10 @@ export class Sidebar {
           nameInput,
           el('div', {
             class: 'paint-sub',
-            text: index < 3 ? `key ${index + 1} · ${colors.length} colours` : `${colors.length} colours`,
+            text:
+              index < 3
+                ? `key ${index + 1} · ${colors.length} colours`
+                : `${colors.length} colours`,
           }),
         ]),
       ]);
@@ -376,7 +379,11 @@ export class Sidebar {
 }
 
 /** Editable name field: commits on change, Enter blurs, keys never leak to hotkeys. */
-function renameInput(name: string, value: string, onCommit: (value: string) => void): HTMLInputElement {
+function renameInput(
+  name: string,
+  value: string,
+  onCommit: (value: string) => void,
+): HTMLInputElement {
   const input = el('input', { class: 'text-input', name, value });
   input.addEventListener('change', () => onCommit(input.value));
   input.addEventListener('keydown', (event) => {

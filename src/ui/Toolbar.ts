@@ -38,9 +38,24 @@ export class Toolbar {
     const row = el('div', { class: 'toolbar-row' }, [
       el('div', { class: 'seg', title: 'Switch with Tab' }, [this.orbitBtn, this.walkBtn]),
       this.toneBtn,
-      el('button', { class: 'btn', text: 'Frame', title: 'Frame the whole scene (F)', onclick: () => this.cb.onFrame() }),
-      el('button', { class: 'btn', text: 'PNG', title: 'Screenshot at 2× (P)', onclick: () => this.cb.onScreenshot() }),
-      el('button', { class: 'btn ghost', text: '?', title: 'Keyboard shortcuts (?)', onclick: () => this.cb.onToggleHelp() }),
+      el('button', {
+        class: 'btn',
+        text: 'Frame',
+        title: 'Frame the whole scene (F)',
+        onclick: () => this.cb.onFrame(),
+      }),
+      el('button', {
+        class: 'btn',
+        text: 'PNG',
+        title: 'Screenshot at 2× (P)',
+        onclick: () => this.cb.onScreenshot(),
+      }),
+      el('button', {
+        class: 'btn ghost',
+        text: '?',
+        title: 'Keyboard shortcuts (?)',
+        onclick: () => this.cb.onToggleHelp(),
+      }),
     ]);
 
     clear(this.root);

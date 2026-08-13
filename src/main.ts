@@ -12,7 +12,13 @@ import { DropZone } from './ui/DropZone.ts';
 import { DebugPanel } from './ui/DebugPanel.ts';
 import { HelpOverlay } from './ui/HelpOverlay.ts';
 import { StatusPanel } from './ui/StatusPanel.ts';
-import { downloadBlob, downloadText, isTypingTarget, requireElement, pickFile } from './util/dom.ts';
+import {
+  downloadBlob,
+  downloadText,
+  isTypingTarget,
+  requireElement,
+  pickFile,
+} from './util/dom.ts';
 import type { LoadedScene, NavMode, SchemeView, SceneSettings } from './types.ts';
 
 class App {
@@ -182,7 +188,10 @@ class App {
     // lightmapped scenes, where the bake already contains its occlusion) would
     // silently disable it — give this file a default of 1 unless the user has
     // already chosen a value.
-    if (this.store.scene.settings.aoMapIntensity === undefined && scene.aoOnlyMaterials.length > 0) {
+    if (
+      this.store.scene.settings.aoMapIntensity === undefined &&
+      scene.aoOnlyMaterials.length > 0
+    ) {
       this.store.setSetting('aoMapIntensity', 1);
     }
 
@@ -496,10 +505,11 @@ class App {
 
   private async screenshot(): Promise<void> {
     const scheme = this.store.schemes.find((s) => s.id === this.store.activeSchemeId);
-    const slug = (scheme?.name ?? 'custom')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '') || 'custom';
+    const slug =
+      (scheme?.name ?? 'custom')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'custom';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
     this.status('Rendering 2× screenshot…');

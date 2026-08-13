@@ -104,12 +104,7 @@ export function createFallbackScene(): Group {
 
   // Two walls meeting in a corner, plus floor and ceiling. Wall colours are
   // deliberately different so the sidebar has something to tell apart.
-  const north = surface(
-    'PAINT_Living_North',
-    '#e8e4da',
-    new PlaneGeometry(ROOM.w, ROOM.h),
-    bake,
-  );
+  const north = surface('PAINT_Living_North', '#e8e4da', new PlaneGeometry(ROOM.w, ROOM.h), bake);
   north.position.set(0, ROOM.h / 2, -ROOM.d / 2);
   root.add(north);
 
@@ -118,7 +113,13 @@ export function createFallbackScene(): Group {
   east.rotation.y = -Math.PI / 2;
   root.add(east);
 
-  const ceiling = surface('PAINT_Ceiling', '#f4f2ee', new PlaneGeometry(ROOM.w, ROOM.d), bake, 0.96);
+  const ceiling = surface(
+    'PAINT_Ceiling',
+    '#f4f2ee',
+    new PlaneGeometry(ROOM.w, ROOM.d),
+    bake,
+    0.96,
+  );
   ceiling.position.set(0, ROOM.h, 0);
   ceiling.rotation.x = Math.PI / 2;
   root.add(ceiling);
@@ -130,7 +131,11 @@ export function createFallbackScene(): Group {
   floor.rotation.x = -Math.PI / 2;
   root.add(floor);
 
-  const skirtingMat = new MeshStandardMaterial({ name: 'Trim_White', color: '#f6f5f2', roughness: 0.5 });
+  const skirtingMat = new MeshStandardMaterial({
+    name: 'Trim_White',
+    color: '#f6f5f2',
+    roughness: 0.5,
+  });
   const skirtingN = new Mesh(withUv1(new BoxGeometry(ROOM.w, 0.09, 0.02)), skirtingMat);
   skirtingN.position.set(0, 0.045, -ROOM.d / 2 + 0.01);
   skirtingN.name = 'Skirting_North';
@@ -142,13 +147,21 @@ export function createFallbackScene(): Group {
   root.add(skirtingE);
 
   // A low sideboard for scale and a shadowed reference against the wall.
-  const woodMat = new MeshStandardMaterial({ name: 'Furniture_Walnut', color: '#4a3527', roughness: 0.45 });
+  const woodMat = new MeshStandardMaterial({
+    name: 'Furniture_Walnut',
+    color: '#4a3527',
+    roughness: 0.45,
+  });
   const sideboard = new Mesh(withUv1(new BoxGeometry(1.6, 0.55, 0.42)), woodMat);
   sideboard.position.set(-0.6, 0.275, -ROOM.d / 2 + 0.24);
   sideboard.name = 'Sideboard';
   root.add(sideboard);
 
-  const potMat = new MeshStandardMaterial({ name: 'Ceramic_Grey', color: '#b9b4ad', roughness: 0.35 });
+  const potMat = new MeshStandardMaterial({
+    name: 'Ceramic_Grey',
+    color: '#b9b4ad',
+    roughness: 0.35,
+  });
   const pot = new Mesh(withUv1(new BoxGeometry(0.18, 0.22, 0.18)), potMat);
   pot.position.set(-0.15, 0.66, -ROOM.d / 2 + 0.24);
   pot.name = 'Pot';

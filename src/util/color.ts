@@ -33,16 +33,16 @@ export interface HSV {
 
 export function hexToRgb(hex: string): [number, number, number] {
   const n = normalizeHex(hex) ?? '#000000';
-  return [
-    parseInt(n.slice(1, 3), 16),
-    parseInt(n.slice(3, 5), 16),
-    parseInt(n.slice(5, 7), 16),
-  ];
+  return [parseInt(n.slice(1, 3), 16), parseInt(n.slice(3, 5), 16), parseInt(n.slice(5, 7), 16)];
 }
 
+const toChannelHex = (v: number): string =>
+  Math.max(0, Math.min(255, Math.round(v)))
+    .toString(16)
+    .padStart(2, '0');
+
 export function rgbToHex(r: number, g: number, b: number): string {
-  const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
-  return `#${c(r)}${c(g)}${c(b)}`;
+  return `#${toChannelHex(r)}${toChannelHex(g)}${toChannelHex(b)}`;
 }
 
 export function hexToHsv(hex: string): HSV {
@@ -69,13 +69,18 @@ export function hsvToHex({ h, s, v }: HSV): string {
   const c = v * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = v - c;
-  const seg = Math.floor(((h % 360) + 360) % 360 / 60);
+  const seg = Math.floor((((h % 360) + 360) % 360) / 60);
   const rgb: [number, number, number] =
-    seg === 0 ? [c, x, 0] :
-    seg === 1 ? [x, c, 0] :
-    seg === 2 ? [0, c, x] :
-    seg === 3 ? [0, x, c] :
-    seg === 4 ? [x, 0, c] :
-                [c, 0, x];
+    seg === 0
+      ? [c, x, 0]
+      : seg === 1
+        ? [x, c, 0]
+        : seg === 2
+          ? [0, c, x]
+          : seg === 3
+            ? [0, x, c]
+            : seg === 4
+              ? [x, 0, c]
+              : [c, 0, x];
   return rgbToHex((rgb[0] + m) * 255, (rgb[1] + m) * 255, (rgb[2] + m) * 255);
 }

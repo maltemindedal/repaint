@@ -5,7 +5,7 @@ export default defineConfig({
   // static host) without rewriting asset URLs.
   base: './',
   build: {
-    target: 'es2022',
+    target: 'es2023',
     sourcemap: true,
     chunkSizeWarningLimit: 1500,
   },

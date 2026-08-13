@@ -77,21 +77,21 @@ Rules that matter:
 
 - **Discovery is by material name, never by mesh name.** Name your objects whatever
   you like. A mesh called `PAINT_Floor_Mesh` whose material is `Floor_Oak` will
-  *not* be paintable — which is the intended behaviour.
+  _not_ be paintable — which is the intended behaviour.
 - **One material per repaintable surface.** If the north and south walls share a
   material, they are one entry and always get the same colour. That is usually what
   you want for a single room; split the material if you want them independent.
 - **Paintable materials must use a flat Base Color** — a colour swatch straight
-  into Principled BSDF's *Base Color*, with **no image texture plugged in**. The app
+  into Principled BSDF's _Base Color_, with **no image texture plugged in**. The app
   writes `material.color` directly, so a base-colour texture would sit on top and
-  hide your paint. The sidebar's *All materials* list flags any material carrying a
+  hide your paint. The sidebar's _All materials_ list flags any material carrying a
   colour texture.
 - **Principled BSDF only.** The glTF exporter maps it to `MeshStandardMaterial`,
   which is what the app looks for.
 - Roughness/metallic are yours. Matte wall paint is roughly `roughness 0.9`,
   `metallic 0`.
 
-**If you don't follow this**: the app lists *every* material in the scene under
+**If you don't follow this**: the app lists _every_ material in the scene under
 **All materials** in the sidebar, and you tick the ones you want to repaint. That
 tagging is remembered per file name, so you only do it once. You can also un-tick a
 `PAINT_` material to hide it from the list.
@@ -126,7 +126,7 @@ For each object that should carry baked light:
    (otherwise leave it off).
 2. In each material, add an **Image Texture** node, point it at that image, and
    **select the node but do not connect it**. Cycles bakes into whichever image
-   texture node is *active* in the material. Also set the node's UV source: add a
+   texture node is _active_ in the material. Also set the node's UV source: add a
    **UV Map** node, set it to your lightmap UV layer, and wire it into the image
    texture's `Vector`.
 
@@ -136,7 +136,7 @@ For each object that should carry baked light:
 2. Scroll to **Bake**.
 3. **Bake Type**:
    - **Combined** — everything, including the base colour of the wall. Convenient,
-     but it bakes the *current* paint colour into the texture, which fights with
+     but it bakes the _current_ paint colour into the texture, which fights with
      recolouring. Only use it if you set every paintable material to pure white
      first.
    - **Diffuse** with **Direct + Indirect** checked and **Color unchecked** — this
@@ -144,7 +144,7 @@ For each object that should carry baked light:
      can multiply your live paint colour by it. ✅ **Recommended.**
    - **Ambient Occlusion** — cheap, fast, no light direction. Fine for a first pass.
 4. Check **Margin** ≈ 16 px.
-5. **Bake**. Save the image (`Image → Save As`, PNG or JPG) *and* keep it packed
+5. **Bake**. Save the image (`Image → Save As`, PNG or JPG) _and_ keep it packed
    (`File → External Data → Pack Resources`) so it travels inside the `.glb`.
 
 **d. Hook it up for export.**
@@ -152,7 +152,7 @@ For each object that should carry baked light:
 Principled BSDF has no occlusion input, so the glTF exporter reads the bake from a
 dedicated node group instead. Per the
 [Blender manual](https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html#baked-ambient-occlusion),
-it looks for *"a custom node group by the name of `glTF Material Output`"* with an
+it looks for _"a custom node group by the name of `glTF Material Output`"_ with an
 input named **`Occlusion`**.
 
 1. Enable **Preferences → Add-ons → Shader Editor Add-ons** (`Node Wrangler`'s
@@ -178,7 +178,7 @@ On import, for a standalone bake, the app:
 - flags it **sRGB** — a Cycles bake saved as PNG/JPG is sRGB-encoded, and reading it
   as linear data would wash the room out,
 - assigns it to **`material.lightMap`**, which samples full RGB and multiplies into
-  diffuse irradiance — which is what baked light *is*,
+  diffuse irradiance — which is what baked light _is_,
 - and points `material.aoMap` at the **same texture instance** with
   **`aoMapIntensity = 0`**.
 
@@ -190,7 +190,7 @@ light, push **AO intensity** up and **Lightmap intensity** down.
 **Why the default lightmap intensity is π (3.14), not 1.** three.js adds the
 lightmap to `irradiance`, and `RE_IndirectDiffuse_Physical` then multiplies that by
 `BRDF_Lambert() = albedo / π`. A Cycles Diffuse or Combined bake already stores
-outgoing radiance for a white surface — the answer *before* that division. Leaving
+outgoing radiance for a white surface — the answer _before_ that division. Leaving
 the intensity at 1 makes the room come out π times too dark, which people usually
 compensate for by cranking exposure and wrecking the colours. Setting it to π puts
 the division back, so a bake value of "fully lit" renders as your paint colour at
@@ -203,19 +203,19 @@ falls back to `UV0` and logs a warning rather than rendering the wall black.
 
 **File → Export → glTF 2.0 (.glb/.gltf)**
 
-| Setting | Value | Why |
-| --- | --- | --- |
-| **Format** | `glTF Binary (.glb)` | One self-contained file with textures packed in. |
-| **Include → Selected Objects** | off (or on, deliberately) | Easy way to ship a single room. |
-| **Include → Cameras** | **on** | Needed for `START_CAM`, see below. |
-| **Include → Punctual Lights** | your call | The app loads them but leaves them **off** when it detects a bake. Toggle in the debug panel. |
-| **Transform → +Y Up** | **on** (the default) | Converts Blender's Z-up. Leave it alone. |
-| **Data → Mesh → Apply Modifiers** | **on** | Otherwise your Solidify/Bevel/Array modifiers don't ship. |
-| **Data → Mesh → UVs** | **on** | Non-negotiable — it's how the lightmap is sampled. |
-| **Data → Mesh → Normals** | **on** | |
-| **Data → Material → Materials** | `Export` | |
-| **Data → Material → Images** | `Automatic` (or `JPEG` to shrink lightmaps) | |
-| **Compression (Draco)** | on for anything big | Fully supported, see below. |
+| Setting                           | Value                                       | Why                                                                                           |
+| --------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Format**                        | `glTF Binary (.glb)`                        | One self-contained file with textures packed in.                                              |
+| **Include → Selected Objects**    | off (or on, deliberately)                   | Easy way to ship a single room.                                                               |
+| **Include → Cameras**             | **on**                                      | Needed for `START_CAM`, see below.                                                            |
+| **Include → Punctual Lights**     | your call                                   | The app loads them but leaves them **off** when it detects a bake. Toggle in the debug panel. |
+| **Transform → +Y Up**             | **on** (the default)                        | Converts Blender's Z-up. Leave it alone.                                                      |
+| **Data → Mesh → Apply Modifiers** | **on**                                      | Otherwise your Solidify/Bevel/Array modifiers don't ship.                                     |
+| **Data → Mesh → UVs**             | **on**                                      | Non-negotiable — it's how the lightmap is sampled.                                            |
+| **Data → Mesh → Normals**         | **on**                                      |                                                                                               |
+| **Data → Material → Materials**   | `Export`                                    |                                                                                               |
+| **Data → Material → Images**      | `Automatic` (or `JPEG` to shrink lightmaps) |                                                                                               |
+| **Compression (Draco)**           | on for anything big                         | Fully supported, see below.                                                                   |
 
 **Scale.** Work in metres. The default walk eye height is 1.65 m and the movement
 speed is 2.4 m/s; if your scene is in centimetres you'll appear to be a 165 m giant
@@ -265,7 +265,7 @@ with whether it's paintable and whether it carries a colour texture.
 The app defaults to **ACES filmic tone mapping**, because that's what makes a
 three.js view resemble a Cycles render — it rolls off highlights and adds the
 contrast you expect from a rendered image. But tone mapping is a non-linear
-transform applied *after* lighting. A wall painted `#E8E4DA` will **not** produce
+transform applied _after_ lighting. A wall painted `#E8E4DA` will **not** produce
 `#E8E4DA` on screen: it's been multiplied by the lightmap and then pushed through a
 film curve.
 
@@ -285,7 +285,7 @@ So:
   than it is.
 
 **None of this replaces a physical sample.** Screen gamut, panel calibration,
-ambient light in *your* room and the sheen of the actual paint all move the result
+ambient light in _your_ room and the sheen of the actual paint all move the result
 more than anything in this app. Use it to shortlist and to compare colours against
 each other, then buy tester pots and put them on the actual wall in daylight and at
 night. The A/B scheme flipping (`1` / `2` / `3` from a fixed viewpoint) is where
@@ -341,21 +341,21 @@ every wall.
 
 ## Keyboard shortcuts
 
-| Key | Action |
-| --- | --- |
-| `Tab` | Orbit ⇄ Walk |
-| `W` `A` `S` `D` | Walk (`Shift` = faster) |
-| `Q` / `E` | Lower / raise eye height (scroll also works) |
-| `L` | Pointer lock (walk mode) |
-| `Esc` | Release pointer lock · close help · deselect |
-| double-click | Orbit: set the pivot to that point |
-| `F` | Frame the whole scene |
-| `1` `2` `3` | Apply scheme slot 1 / 2 / 3 |
-| `R` | Reset the selected wall |
-| `T` | Tone mapping on/off |
-| `P` | 2× PNG screenshot |
-| `` ` `` | Debug panel + FPS meter |
-| `?` | Shortcut list |
+| Key             | Action                                       |
+| --------------- | -------------------------------------------- |
+| `Tab`           | Orbit ⇄ Walk                                 |
+| `W` `A` `S` `D` | Walk (`Shift` = faster)                      |
+| `Q` / `E`       | Lower / raise eye height (scroll also works) |
+| `L`             | Pointer lock (walk mode)                     |
+| `Esc`           | Release pointer lock · close help · deselect |
+| double-click    | Orbit: set the pivot to that point           |
+| `F`             | Frame the whole scene                        |
+| `1` `2` `3`     | Apply scheme slot 1 / 2 / 3                  |
+| `R`             | Reset the selected wall                      |
+| `T`             | Tone mapping on/off                          |
+| `P`             | 2× PNG screenshot                            |
+| `` ` ``         | Debug panel + FPS meter                      |
+| `?`             | Shortcut list                                |
 
 ---
 
@@ -457,6 +457,15 @@ npm test
 It builds the procedural room, runs discovery against it, and checks the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
+
+Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
+`.oxlintrc.json` / `.oxfmtrc.json`):
+
+```bash
+npm run lint           # oxlint
+npm run format         # oxfmt --write
+npm run check          # typecheck + lint + format check, in one
+```
 
 For manual testing against an actual glTF file — the loader, the occlusion→lightmap
 rerouting, `TEXCOORD_1`, `START_CAM` — generate a fixture and drop it in:

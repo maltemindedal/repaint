@@ -108,19 +108,43 @@ function place(geometry, position, rotation = [0, 0, 0]) {
 }
 
 const parts = [
-  { name: 'North_Wall', material: 'PAINT_Living_North', color: '#e8e4da',
-    geometry: place(new PlaneGeometry(W, H), [0, H / 2, -D / 2]) },
-  { name: 'East_Wall', material: 'PAINT_Living_East', color: '#d9d3c6',
-    geometry: place(new PlaneGeometry(D, H), [W / 2, H / 2, 0], [0, -Math.PI / 2, 0]) },
-  { name: 'West_Wall', material: 'PAINT_Living_West', color: '#dfd8c9',
-    geometry: place(new PlaneGeometry(D, H), [-W / 2, H / 2, 0], [0, Math.PI / 2, 0]) },
-  { name: 'Ceiling_Geo', material: 'PAINT_Ceiling', color: '#f4f2ee',
-    geometry: place(new PlaneGeometry(W, D), [0, H, 0], [Math.PI / 2, 0, 0]) },
+  {
+    name: 'North_Wall',
+    material: 'PAINT_Living_North',
+    color: '#e8e4da',
+    geometry: place(new PlaneGeometry(W, H), [0, H / 2, -D / 2]),
+  },
+  {
+    name: 'East_Wall',
+    material: 'PAINT_Living_East',
+    color: '#d9d3c6',
+    geometry: place(new PlaneGeometry(D, H), [W / 2, H / 2, 0], [0, -Math.PI / 2, 0]),
+  },
+  {
+    name: 'West_Wall',
+    material: 'PAINT_Living_West',
+    color: '#dfd8c9',
+    geometry: place(new PlaneGeometry(D, H), [-W / 2, H / 2, 0], [0, Math.PI / 2, 0]),
+  },
+  {
+    name: 'Ceiling_Geo',
+    material: 'PAINT_Ceiling',
+    color: '#f4f2ee',
+    geometry: place(new PlaneGeometry(W, D), [0, H, 0], [Math.PI / 2, 0, 0]),
+  },
   // Deliberately named so that *mesh*-name matching would wrongly catch it.
-  { name: 'PAINT_Floor_Mesh', material: 'Floor_Oak', color: '#8a6b4a',
-    geometry: place(new PlaneGeometry(W, D), [0, 0, 0], [-Math.PI / 2, 0, 0]) },
-  { name: 'Sideboard', material: 'Furniture_Walnut', color: '#4a3527',
-    geometry: place(new BoxGeometry(1.6, 0.55, 0.42), [-0.6, 0.275, -D / 2 + 0.24]) },
+  {
+    name: 'PAINT_Floor_Mesh',
+    material: 'Floor_Oak',
+    color: '#8a6b4a',
+    geometry: place(new PlaneGeometry(W, D), [0, 0, 0], [-Math.PI / 2, 0, 0]),
+  },
+  {
+    name: 'Sideboard',
+    material: 'Furniture_Walnut',
+    color: '#4a3527',
+    geometry: place(new BoxGeometry(1.6, 0.55, 0.42), [-0.6, 0.275, -D / 2 + 0.24]),
+  },
 ];
 
 // --------------------------------------------------------------- GLB assembly
@@ -153,9 +177,7 @@ const USHORT = 5123;
 
 function addAccessor(array, type, componentType, target) {
   const buffer = Buffer.from(
-    componentType === FLOAT
-      ? Float32Array.from(array).buffer
-      : Uint16Array.from(array).buffer,
+    componentType === FLOAT ? Float32Array.from(array).buffer : Uint16Array.from(array).buffer,
   );
   const view = addBufferView(buffer, target);
   const stride = { SCALAR: 1, VEC2: 2, VEC3: 3 }[type];
@@ -179,10 +201,11 @@ function addAccessor(array, type, componentType, target) {
   return accessors.length - 1;
 }
 
+// glTF baseColorFactor is linear; the exporter does this conversion too.
+const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+
 const hexToFactor = (hex) => {
   const srgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  // glTF baseColorFactor is linear; the exporter does this conversion too.
-  const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return [...srgb.map(toLinear), 1];
 };
 
