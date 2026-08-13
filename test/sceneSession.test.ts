@@ -10,8 +10,10 @@ import type { CameraPose, LoadedScene, NavMode, PaintTarget } from '../src/types
 
 /**
  * The activation sequence used to be five unwritten ordering rules spread over
- * `App.setScene`. It is one implementation now, so the rules are assertable:
- * every step below is here because getting it wrong broke something.
+ * `App.setScene`. It is one implementation now, so the rules are assertable.
+ *
+ * Each ordering test below names the failure mode it guards; why the order is
+ * that way is written beside the step itself, in `SceneSession.load`.
  */
 
 function makeScene(overrides: Partial<LoadedScene> = {}): LoadedScene {
@@ -113,13 +115,11 @@ describe('scene activation order', () => {
 
     session.load(scene);
 
-    // The picker rebuilds its highlight bookkeeping from the registry, keyed by
-    // material name. Refreshing it against a stale registry pins the previous
-    // scene's material instances under keys the new scene reuses.
+    // Guards: the picker pinning the previous scene's material instances.
     expect(picker.root).toBe(scene.root);
     expect(picker.keysAtSetScene).toContain('PAINT_Living_North');
-    // The real picker refreshes targets from inside `setScene`; a second,
-    // earlier refresh is exactly the bug above.
+    // The real picker refreshes targets from inside `setScene`; an earlier,
+    // separate refresh is the bug.
     expect(picker.keysAtSetScene).toHaveLength(3);
   });
 
@@ -129,7 +129,7 @@ describe('scene activation order', () => {
 
     session.load(scene);
 
-    // Stale bounds clamp the applied pose against the previous apartment.
+    // Guards: the walk clamp holding the applied pose to the previous apartment.
     expect(nav.boundsAtPose).toBe(scene.bounds);
   });
 
@@ -138,9 +138,7 @@ describe('scene activation order', () => {
 
     session.load(makeScene());
 
-    // `applySettings` pushes the eye height into the walk controller, which
-    // emits a pose change. Any earlier and it persists a pose derived from the
-    // previous scene's camera.
+    // Guards: persisting a pose derived from the previous scene's camera.
     expect(log.indexOf('applySettings')).toBeGreaterThan(log.indexOf('nav.applyPose'));
   });
 });

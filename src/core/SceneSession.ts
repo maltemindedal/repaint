@@ -117,28 +117,29 @@ export class SceneSession {
    */
   private applyHeuristicDefaults(scene: LoadedScene): void {
     const { store } = this.deps;
-    const settings = store.scene.settings;
 
     // Baked scenes shouldn't be double-lit, but a scene *without* a bake
     // clearly wants its exported lights on.
-    if (settings.punctualLights === undefined && scene.lights.length > 0) {
-      store.setSetting('punctualLights', !scene.hasBakedTextures);
+    if (scene.lights.length > 0) {
+      store.setDefaultSetting('punctualLights', !scene.hasBakedTextures);
     }
 
     // ORM-packed occlusion can't drive a lightmap, so for those materials the
     // AO slider is the whole effect. The global default of 0 (right for
     // lightmapped scenes, where the bake already contains its occlusion) would
     // silently disable it — give this file a default of 1 instead.
-    if (settings.aoMapIntensity === undefined && scene.aoOnlyMaterials.length > 0) {
-      store.setSetting('aoMapIntensity', 1);
+    if (scene.aoOnlyMaterials.length > 0) {
+      store.setDefaultSetting('aoMapIntensity', 1);
     }
   }
 
   /**
-   * Rebuilds the paint targets and repaints them from the store — the single
-   * record of what was on screen. Discovery deliberately restores nothing of
-   * its own: it reports the graph as it finds it, and everything the user
-   * chose comes back through here.
+   * Rebuilds the paint targets and repaints them from the store.
+   *
+   * The store is the single record of what was on screen, and this is the
+   * single place it is played back. Discovery deliberately restores nothing of
+   * its own — one restore mechanism, not two, so there is no second copy to
+   * drift out of agreement with the sidebar.
    */
   private discoverTargets(): void {
     const { registry, store } = this.deps;

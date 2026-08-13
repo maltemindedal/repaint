@@ -245,6 +245,20 @@ describe('persistence', () => {
     expect(restored.settings.exposure).toBe(1.4);
   });
 
+  it('lets a guess fill a setting the user has not decided, and only that', () => {
+    const store = new AppStore(emptyData());
+    store.useScene('apartment.glb');
+
+    store.setDefaultSetting('punctualLights', true);
+    expect(store.settings.punctualLights).toBe(true);
+
+    // A guess never overrules a choice — including a choice that happens to
+    // equal the global default, which `settings` alone could not tell apart.
+    store.setSetting('aoMapIntensity', 0);
+    store.setDefaultSetting('aoMapIntensity', 1);
+    expect(store.settings.aoMapIntensity).toBe(0);
+  });
+
   it('always hands back three keyboard-addressable scheme slots', () => {
     const store = new AppStore(migrate({ version: 1, scenes: { 'x.glb': { schemes: [] } } }));
     store.useScene('x.glb');

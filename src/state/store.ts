@@ -228,6 +228,17 @@ export class AppStore {
     this.queueSave();
   }
 
+  /**
+   * Records a guess: writes only when this scene has no choice of its own.
+   *
+   * `settings` merges the global defaults in, so it can't answer "has the user
+   * decided this?" — only the raw per-scene block can, and that stays in here.
+   */
+  setDefaultSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
+    if (this.scene.settings[key] !== undefined) return;
+    this.setSetting(key, value);
+  }
+
   // ------------------------------------------------------- import/export
 
   exportJSON(): string {
