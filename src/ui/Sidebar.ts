@@ -331,6 +331,9 @@ export class Sidebar {
       hex: currentHex,
       originalHex,
       library: this.library,
+      // The row is redrawn by the render this change comes back as, not from
+      // here — one writer, so a row can never show a colour the scene doesn't
+      // have. Remembering the hex only keeps that render off an active drag.
       onChange: (hex) => {
         this.pickerHex = hex;
         this.cb.onColorChange(key, hex);

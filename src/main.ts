@@ -2,6 +2,7 @@ import './style.css';
 import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
+import { PaintController } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
 import { defaultPose } from './core/processScene.ts';
 import { NavigationController } from './nav/NavigationController.ts';
@@ -30,6 +31,7 @@ class App {
   private picker: Picker;
   private nav: NavigationController;
   private store = new AppStore();
+  private paint = new PaintController(this.registry, this.store);
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
@@ -54,7 +56,7 @@ class App {
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
-      onColorChange: (key, hex) => this.setColor(key, hex),
+      onColorChange: (key, hex) => this.paint.apply(key, hex),
       onResetTarget: (key) => this.resetTarget(key),
       onResetAll: () => this.resetAll(),
       onTagChange: (name, tagged) => this.setTag(name, tagged),
@@ -91,6 +93,11 @@ class App {
     this.debug.mount(requireElement('viewport'));
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
+
+    // PaintController owns the writes and only emits when something actually
+    // moved; both views work out what that means for the DOM themselves, so
+    // there is nothing here to unpack.
+    this.paint.onPaintChanged = () => this.render();
 
     this.picker.onHover = (target) => {
       this.hoveredKey = target?.key ?? null;
@@ -227,7 +234,9 @@ class App {
     const prefs = this.store.scene;
     this.registry.discover(this.scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
 
-    // Restore whatever colours were on screen last time.
+    // Restore whatever colours were on screen last time. Straight to the
+    // registry, not through PaintController: this reads *from* the store, so
+    // writing back would only re-save it and drop the active scheme.
     for (const [key, hex] of Object.entries(this.store.currentColors)) {
       this.registry.setColor(key, hex);
     }
@@ -238,29 +247,16 @@ class App {
 
   // -------------------------------------------------------------- colour
 
-  private setColor(key: string, hex: string): void {
-    if (!this.registry.setColor(key, hex)) return;
-    this.store.setCurrentColor(key, hex);
-    this.store.setActiveScheme(null);
-    this.render();
-  }
-
   private resetTarget(key: string): void {
-    const target = this.registry.get(key);
+    const target = this.paint.reset(key);
     if (!target) return;
-    this.registry.resetColor(key);
-    this.store.clearCurrentColor(key);
-    this.render();
     this.panel.status(
       `${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`,
     );
   }
 
   private resetAll(): void {
-    this.registry.resetAll();
-    for (const target of this.registry.list()) this.store.clearCurrentColor(target.key);
-    this.store.setActiveScheme(null);
-    this.render();
+    this.paint.resetAll();
     this.panel.status('All walls back to their exported colours');
   }
 
@@ -288,36 +284,28 @@ class App {
       this.panel.status('Select a wall first, then click a library colour.', 3500);
       return;
     }
-    this.setColor(this.selectedKey, entry.hex);
+    if (!this.paint.apply(this.selectedKey, entry.hex)) return;
     this.panel.status(`${entry.name} applied`);
   }
 
   // ------------------------------------------------------------- schemes
 
   private applyScheme(id: string): void {
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    if (!scheme) return;
-    const count = Object.keys(scheme.colors).length;
-    if (count === 0) {
-      this.panel.status(`“${scheme.name}” is empty — use “Save current” to fill it.`, 4000);
+    const result = this.paint.applyScheme(id);
+    if (result.outcome === 'missing') return;
+    if (result.outcome === 'empty') {
+      this.panel.status(`“${result.scheme.name}” is empty — use “Save current” to fill it.`, 4000);
       return;
     }
-
-    const applied = this.registry.applyScheme(scheme.colors);
-    for (const target of this.registry.list()) {
-      this.store.setCurrentColor(target.key, target.currentHex);
-    }
-    this.store.setActiveScheme(id);
-    this.render();
-    this.panel.status(`${scheme.name} — ${applied}/${count} colours applied`);
+    this.panel.status(
+      `${result.scheme.name} — ${result.applied}/${result.requested} colours applied`,
+    );
   }
 
   private captureScheme(id: string): void {
-    this.store.saveScheme(id, this.registry.capture());
-    this.store.setActiveScheme(id);
-    this.render();
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    this.panel.status(`Saved current colours into “${scheme?.name ?? id}”`);
+    const scheme = this.paint.capture(id);
+    if (!scheme) return;
+    this.panel.status(`Saved current colours into “${scheme.name}”`);
   }
 
   // -------------------------------------------------------------- views

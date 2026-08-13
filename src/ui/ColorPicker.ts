@@ -142,25 +142,28 @@ export class ColorPicker {
           class: 'chip',
           style: `background:${entry.hex}`,
           title: `${entry.name} · ${entry.hex.toUpperCase()}`,
-          onclick: () => this.setHex(entry.hex),
+          onclick: () => this.pick(entry.hex),
         }),
       );
     }
   }
 
-  /** A colour the user chose *here* — swatches move and `onChange` fires. */
-  private setHex(hex: string): void {
-    if (this.adoptHex(hex)) this.sync(true);
-  }
-
   /**
-   * A colour applied somewhere else (a scheme, a library click, a reset).
-   * Silent on purpose: the app already knows, and echoing it back through
-   * `onChange` would land as a fresh manual edit — which is what forced call
-   * sites to sync the picker *before* recording the change that caused it.
+   * Shows a colour that has already been applied elsewhere — a scheme, the
+   * sidebar library, a reset. Silent on purpose: notifying here would push the
+   * change back into the paint fan-out that produced it, which at best re-does
+   * the write and at worst clears the scheme selection that caused it.
    */
   showHex(hex: string): void {
+    // Already on screen. Re-adopting would round-trip through HSV, which throws
+    // away the hue a cursor parked at zero saturation is still holding.
+    if (normalizeHex(hex) === this.currentHex()) return;
     if (this.adoptHex(hex)) this.sync();
+  }
+
+  /** A colour chosen *inside* the picker — applies it and tells the app. */
+  private pick(hex: string): void {
+    if (this.adoptHex(hex)) this.sync(true);
   }
 
   /** False when the text isn't a colour, in which case nothing moves. */
