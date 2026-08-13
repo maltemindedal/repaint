@@ -1,152 +1,256 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { NavigationController } from '../src/nav/NavigationController.ts';
-import type { Viewer } from '../src/core/Viewer.ts';
 import type { CameraPose, NavMode } from '../src/types.ts';
 
 /**
- * Headless exercise of the mode hand-off.
+ * Mode switching as a state transition over a camera — no renderer, no canvas.
  *
- * `NavigationController` is the one module under `nav/` that can be driven
- * without a renderer — it only reads `viewer.camera` and `viewer.canvas`. It
- * does need listeners, though, so unlike the smoke test this one stands up a
- * stub DOM on `globalThis` for the duration of each test. That is the whole
- * cost of keeping `environment: 'node'`; the alternative is a jsdom dependency
- * for a handful of `addEventListener` calls.
+ * `OrbitControls` and `WalkControls` only ever need an event target and a few
+ * layout numbers, so a stub element is enough to exercise the real controller
+ * in node.
  */
 
-// ------------------------------------------------------------------ stub DOM
+const pointerLockListeners = new Set<() => void>();
 
-/** Minimal event target: enough for `addEventListener` plus manual dispatch. */
-function makeEventTarget() {
-  const listeners = new Map<string, Set<(event: unknown) => void>>();
-  return {
-    addEventListener(type: string, fn: (event: unknown) => void) {
-      if (!listeners.has(type)) listeners.set(type, new Set());
-      listeners.get(type)!.add(fn);
-    },
-    removeEventListener(type: string, fn: (event: unknown) => void) {
-      listeners.get(type)?.delete(fn);
-    },
-    dispatch(type: string, event: Record<string, unknown> = {}) {
-      for (const fn of listeners.get(type) ?? []) {
-        fn({ target: null, preventDefault() {}, ...event });
-      }
-    },
-  };
-}
+/**
+ * `WalkControls` binds WASD on `window`, so driving a walk needs a stub that
+ * actually delivers events rather than swallowing them.
+ */
+const windowListeners = new Map<string, Set<(event: unknown) => void>>();
 
-type StubTarget = ReturnType<typeof makeEventTarget>;
+const fakeWindow = {
+  addEventListener(type: string, listener: (event: unknown) => void): void {
+    if (!windowListeners.has(type)) windowListeners.set(type, new Set());
+    windowListeners.get(type)!.add(listener);
+  },
+  removeEventListener(type: string, listener: (event: unknown) => void): void {
+    windowListeners.get(type)?.delete(listener);
+  },
+  /** `target: null` so `isTypingTarget` reads it as "not typing". */
+  dispatch(type: string, event: Record<string, unknown> = {}): void {
+    for (const listener of windowListeners.get(type) ?? []) {
+      listener({ target: null, preventDefault() {}, ...event });
+    }
+  },
+};
 
-interface Harness {
-  nav: NavigationController;
-  camera: PerspectiveCamera;
-  win: StubTarget;
-  emitted: { mode: NavMode; pose: CameraPose }[];
-  /** Drops what's been recorded so far — used to ignore a mode entry's own emit. */
-  resetEmitted(): void;
-  /**
-   * Restores the globals. There is no controller teardown to do: #6 deleted
-   * `dispose()` from both nav classes as untested fiction, and nothing here
-   * needs it — every harness builds its own stub window, document and canvas,
-   * so the listeners a discarded controller leaves behind are attached to
-   * objects that die with it.
-   */
-  dispose(): void;
-}
+const fakeDocument = {
+  pointerLockElement: null as unknown,
+  exitPointerLockCalls: 0,
+  addEventListener(type: string, listener: () => void): void {
+    if (type === 'pointerlockchange') pointerLockListeners.add(listener);
+  },
+  removeEventListener(type: string, listener: () => void): void {
+    if (type === 'pointerlockchange') pointerLockListeners.delete(listener);
+  },
+  exitPointerLock(): void {
+    fakeDocument.exitPointerLockCalls += 1;
+    fakeDocument.setPointerLock(null);
+  },
+  /** Locks (or releases) the pointer the way the browser would: state, then event. */
+  setPointerLock(element: unknown): void {
+    fakeDocument.pointerLockElement = element;
+    for (const listener of pointerLockListeners) listener();
+  },
+};
 
-function makeHarness(): Harness {
-  const win = makeEventTarget();
-  const doc = { ...makeEventTarget(), pointerLockElement: null, exitPointerLock() {} };
-  const canvas = {
-    ...makeEventTarget(),
-    // `style` and `getRootNode` are reached by OrbitControls.connect,
-    // `ownerDocument` by its disconnect, `classList` by the walk-mode class.
-    style: {} as CSSStyleDeclaration,
-    getRootNode: () => doc,
-    ownerDocument: doc,
-    classList: { add() {}, remove() {} },
-  };
+class FakeCanvas {
+  style: Record<string, string> = {};
+  clientWidth = 800;
+  clientHeight = 600;
+  pointerLockRequests = 0;
+  classList = { add(): void {}, remove(): void {}, toggle(): void {} };
 
-  const globals = globalThis as unknown as Record<string, unknown>;
-  const previous = { window: globals.window, document: globals.document };
-  const restore = () => {
-    globals.window = previous.window;
-    globals.document = previous.document;
-  };
-  globals.window = win;
-  globals.document = doc;
-
-  // Anything from here on can throw with the globals swapped in; leaving them
-  // patched would corrupt every later test in the file.
-  try {
-    const camera = new PerspectiveCamera(55, 1, 0.05, 500);
-    camera.position.set(0, 1.65, 0);
-
-    // `Pick` names the exact surface the controller is allowed to touch: if it
-    // grows a `viewer.renderer` read, this stops compiling rather than
-    // throwing at runtime.
-    const viewer: Pick<Viewer, 'camera' | 'canvas'> = {
-      camera,
-      canvas: canvas as unknown as HTMLCanvasElement,
-    };
-
-    const nav = new NavigationController(viewer as Viewer);
-    nav.setBounds(new Box3(new Vector3(-5, 0, -5), new Vector3(5, 2.6, 5)));
-
-    const emitted: Harness['emitted'] = [];
-    nav.onPoseChange = (mode, pose) => emitted.push({ mode, pose });
-
-    return {
-      nav,
-      camera,
-      win,
-      emitted,
-      resetEmitted: () => void (emitted.length = 0),
-      dispose: restore,
-    };
-  } catch (error) {
-    restore();
-    throw error;
+  addEventListener(): void {}
+  removeEventListener(): void {}
+  getRootNode(): unknown {
+    return fakeDocument;
+  }
+  get ownerDocument(): unknown {
+    return fakeDocument;
+  }
+  getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
+    return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight };
+  }
+  requestPointerLock(): void {
+    this.pointerLockRequests += 1;
+    fakeDocument.setPointerLock(this);
   }
 }
+
+beforeAll(() => {
+  Object.assign(globalThis, { window: fakeWindow, document: fakeDocument });
+});
+
+const ORBIT_POSE: CameraPose = { position: [4, 2.1, 4], target: [0, 1, 0] };
+const WALK_POSE: CameraPose = { position: [-1, 1.65, 2], target: [-1, 1.65, -1] };
+const EYE_HEIGHT = 1.65;
+
+function buildNav(startPose: CameraPose = ORBIT_POSE) {
+  const canvas = new FakeCanvas();
+  const camera = new PerspectiveCamera(60, 1.6, 0.1, 100);
+  const nav = new NavigationController({ camera, canvas: canvas as unknown as HTMLElement });
+  nav.setBounds(new Box3(new Vector3(-5, 0, -5), new Vector3(5, 2.6, 5)));
+  nav.applyPose(startPose);
+
+  // The store, as `App` wires it: the last emitted pose per mode, handed back
+  // on the next switch into that mode.
+  const emitted: { mode: NavMode; pose: CameraPose }[] = [];
+  const poses = new Map<NavMode, CameraPose>();
+  nav.onPoseChange = (mode, pose) => {
+    emitted.push({ mode, pose });
+    poses.set(mode, pose);
+  };
+  const store = {
+    get: (mode: NavMode) => poses.get(mode) ?? null,
+    set: (mode: NavMode, pose: CameraPose) => poses.set(mode, pose),
+  };
+
+  return { nav, camera, canvas, emitted, store };
+}
+
+type Triple = readonly [number, number, number];
+
+function distance(a: Triple, b: Triple): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+/** The pitch a restored pose would reconstruct, in degrees. */
+function pitchOf(pose: CameraPose): number {
+  const dir = new Vector3().fromArray(pose.target).sub(new Vector3().fromArray(pose.position));
+  return (Math.atan2(dir.y, Math.hypot(dir.x, dir.z)) * 180) / Math.PI;
+}
+
+beforeEach(() => {
+  // Controllers are never torn down — #6 deleted dispose() as untested fiction
+  // — so drop the listeners by hand; otherwise a controller from an earlier
+  // test still sees the next one's lock changes and keystrokes.
+  pointerLockListeners.clear();
+  windowListeners.clear();
+  fakeDocument.pointerLockElement = null;
+  fakeDocument.exitPointerLockCalls = 0;
+});
 
 /** Advances the frame loop at a steady 60 Hz. */
 function step(nav: NavigationController, frames: number): void {
   for (let i = 0; i < frames; i++) nav.update(1 / 60);
 }
 
-/** Orbit round-trips through spherical coordinates, so exact equality is out. */
-function expectNear(actual: [number, number, number], expected: [number, number, number]): void {
-  for (let i = 0; i < 3; i++) expect(actual[i]).toBeCloseTo(expected[i], 6);
+/**
+ * The poses emitted for one mode. A switch reports twice — the mode being left
+ * and the mode being entered — so a bare index would depend on which is which.
+ */
+function posesFor(emitted: { mode: NavMode; pose: CameraPose }[], mode: NavMode): CameraPose[] {
+  return emitted.filter((e) => e.mode === mode).map((e) => e.pose);
 }
 
-// -------------------------------------------------------------------- tests
+describe('mode switching', () => {
+  it('emits the pose that is actually on screen, once', () => {
+    // Standing high and looking dead level at the far wall.
+    const { nav, camera, emitted } = buildNav({ position: [0, 2.1, 4], target: [0, 2.1, -4] });
 
-describe('mode hand-off', () => {
-  let harness: Harness;
+    nav.switchMode('walk');
 
-  beforeEach(() => {
-    harness = makeHarness();
+    expect(nav.mode).toBe('walk');
+    // One pose for the mode entered. (The mode being left reports too, which is
+    // what stops a quick exit from dropping where you stood — covered below.)
+    expect(posesFor(emitted, 'walk')).toHaveLength(1);
+
+    // Compare against the camera a frame later — that is what renders. Reading
+    // getPose() back instead would only compare one function against itself.
+    nav.update(1 / 60);
+    expect(posesFor(emitted, 'walk')).toHaveLength(1);
+    expect(
+      distance(posesFor(emitted, 'walk')[0].position, camera.position.toArray() as Triple),
+    ).toBeLessThan(1e-6);
   });
 
-  afterEach(() => {
-    harness.dispose();
+  it('drops to eye height before reporting, so the view does not tilt', () => {
+    const { nav, emitted } = buildNav({ position: [0, 2.1, 4], target: [0, 2.1, -4] });
+
+    nav.switchMode('walk');
+
+    // Pairing the old camera height with a target computed at the new one would
+    // emit a level view as an ~8.5° downward tilt, which a restore then adopts.
+    const [walkPose] = posesFor(emitted, 'walk');
+    expect(walkPose.position[1]).toBeCloseTo(EYE_HEIGHT, 5);
+    expect(pitchOf(walkPose)).toBeCloseTo(0, 1);
   });
 
+  it('emits the restored pose, not the carried-over one', () => {
+    const { nav, emitted } = buildNav();
+
+    nav.switchMode('walk', WALK_POSE);
+
+    const walkPoses = posesFor(emitted, 'walk');
+    expect(walkPoses).toHaveLength(1);
+    // The carried-over camera stood at ORBIT_POSE; the emitted pose is where
+    // walk mode actually ended up.
+    expect(distance(walkPoses[0].position, WALK_POSE.position)).toBeLessThan(1e-6);
+    expect(distance(walkPoses[0].position, ORBIT_POSE.position)).toBeGreaterThan(1);
+  });
+
+  it("keeps each mode's pose stable across repeated toggles", () => {
+    const { nav, store } = buildNav();
+    store.set('orbit', ORBIT_POSE);
+    store.set('walk', WALK_POSE);
+
+    for (let i = 0; i < 3; i++) {
+      nav.switchMode('walk', store.get('walk'));
+      nav.switchMode('orbit', store.get('orbit'));
+    }
+
+    expect(distance(store.get('orbit')!.position, ORBIT_POSE.position)).toBeLessThan(1e-6);
+    expect(distance(store.get('orbit')!.target, ORBIT_POSE.target)).toBeLessThan(1e-6);
+    expect(distance(store.get('walk')!.position, WALK_POSE.position)).toBeLessThan(1e-6);
+    // Walk stores a look-at point at a fixed distance, so only the direction
+    // round-trips — but it must not rotate.
+    const look = new Vector3()
+      .fromArray(store.get('walk')!.target)
+      .sub(new Vector3().fromArray(WALK_POSE.position));
+    const original = new Vector3()
+      .fromArray(WALK_POSE.target)
+      .sub(new Vector3().fromArray(WALK_POSE.position));
+    expect(look.normalize().dot(original.normalize())).toBeCloseTo(1, 6);
+  });
+
+  it('stands the camera at eye height when entering walk mode', () => {
+    const { nav, camera } = buildNav();
+
+    nav.switchMode('walk');
+    nav.update(1 / 60);
+
+    expect(camera.position.y).toBeCloseTo(1.65, 5);
+  });
+
+  it('ignores a switch to the mode already in effect', () => {
+    const { nav, emitted } = buildNav();
+    let modeChanges = 0;
+    nav.onModeChange = () => modeChanges++;
+
+    nav.switchMode('orbit', WALK_POSE);
+
+    expect(emitted).toHaveLength(0);
+    expect(modeChanges).toBe(0);
+    expect(nav.getPose().position[1]).toBeCloseTo(ORBIT_POSE.position[1], 5);
+  });
+});
+
+describe('leaving a mode', () => {
   it('emits the walk pose you were standing at, even when leaving immediately', () => {
-    const { nav, camera, win, emitted, resetEmitted } = harness;
+    const { nav, camera, emitted } = buildNav();
 
-    nav.setMode('walk');
+    nav.switchMode('walk');
     step(nav, 1);
     const start = camera.position.clone();
-    resetEmitted();
+    emitted.length = 0;
 
     // Walk forward for half a second, then let go and switch straight away —
     // well inside the settle delay that would otherwise emit the pose.
-    win.dispatch('keydown', { code: 'KeyW' });
+    fakeWindow.dispatch('keydown', { code: 'KeyW' });
     step(nav, 30);
-    win.dispatch('keyup', { code: 'KeyW' });
+    fakeWindow.dispatch('keyup', { code: 'KeyW' });
     step(nav, 6);
 
     expect(camera.position.distanceTo(start)).toBeGreaterThan(0.5);
@@ -156,44 +260,40 @@ describe('mode hand-off', () => {
     // Nothing has settled, so the spot being stood on is still unsaved.
     expect(emitted).toHaveLength(0);
 
-    nav.setMode('orbit');
+    nav.switchMode('orbit');
 
     // Capture-out precedes restore-in: the walk pose must be banked before the
-    // orbit pose the switch carries over, or the stale one survives instead.
+    // orbit pose the switch settles on, or the stale one survives instead.
     expect(emitted.map((e) => e.mode)).toEqual(['walk', 'orbit']);
-    expect(emitted[0].pose).toEqual(standingPose);
-    // Position alone would pass even if the emit happened after `_mode` flipped;
-    // the look direction is what proves it read the walk controller.
-    expect(emitted[0].pose.target).not.toEqual(nav.orbit.target.toArray());
+    expect(distance(emitted[0].pose.position, standingPose.position)).toBeLessThan(1e-6);
+    // Position alone would pass even if the emit happened after the mode
+    // flipped; the look direction is what proves it read the walk controller.
+    expect(distance(emitted[0].pose.target, standingPose.target)).toBeLessThan(1e-6);
   });
 
   it('emits the outgoing orbit pose when entering walk mode', () => {
-    const { nav, camera, emitted, resetEmitted } = harness;
+    const { nav, emitted } = buildNav();
 
-    camera.position.set(2, 1.8, 3);
-    nav.orbit.target.set(0, 1, 0);
-    step(nav, 1);
-    resetEmitted();
+    nav.switchMode('walk', WALK_POSE);
 
-    nav.setMode('walk');
-
-    expect(emitted[0].mode).toBe('orbit');
-    expectNear(emitted[0].pose.position, [2, 1.8, 3]);
-    expectNear(emitted[0].pose.target, [0, 1, 0]);
+    const [orbitPose] = posesFor(emitted, 'orbit');
+    expect(orbitPose).toBeDefined();
+    expect(distance(orbitPose.position, ORBIT_POSE.position)).toBeLessThan(1e-6);
+    expect(distance(orbitPose.target, ORBIT_POSE.target)).toBeLessThan(1e-6);
   });
 
   it('stops tracking a pose the switch already banked', () => {
-    const { nav, win, emitted, resetEmitted } = harness;
+    const { nav, emitted } = buildNav();
 
-    nav.setMode('walk');
-    win.dispatch('keydown', { code: 'KeyW' });
+    nav.switchMode('walk');
+    fakeWindow.dispatch('keydown', { code: 'KeyW' });
     step(nav, 30);
-    win.dispatch('keyup', { code: 'KeyW' });
+    fakeWindow.dispatch('keyup', { code: 'KeyW' });
 
     // Out and straight back in, without ever pausing long enough to settle.
-    nav.setMode('orbit');
-    nav.setMode('walk');
-    resetEmitted();
+    nav.switchMode('orbit');
+    nav.switchMode('walk');
+    emitted.length = 0;
 
     // A full second of stillness. The walk pose was banked on the way out, so
     // the settle timer has nothing left to report.
@@ -201,12 +301,41 @@ describe('mode hand-off', () => {
 
     expect(emitted).toHaveLength(0);
   });
+});
 
-  it('does not emit anything when the mode is unchanged', () => {
-    const { nav, emitted } = harness;
+describe('pointer lock', () => {
+  it('locks only in walk mode', () => {
+    const { nav, canvas } = buildNav();
 
-    nav.setMode('orbit');
+    nav.requestPointerLock();
+    expect(canvas.pointerLockRequests).toBe(0);
+    expect(nav.isPointerLocked).toBe(false);
 
-    expect(emitted).toHaveLength(0);
+    nav.switchMode('walk');
+    nav.requestPointerLock();
+    expect(canvas.pointerLockRequests).toBe(1);
+    expect(nav.isPointerLocked).toBe(true);
+  });
+
+  it('releases the lock it holds', () => {
+    const { nav } = buildNav();
+    nav.switchMode('walk');
+    nav.requestPointerLock();
+
+    nav.exitPointerLock();
+
+    expect(fakeDocument.exitPointerLockCalls).toBe(1);
+    expect(nav.isPointerLocked).toBe(false);
+  });
+
+  it('releases the lock when leaving walk mode', () => {
+    const { nav } = buildNav();
+    nav.switchMode('walk');
+    nav.requestPointerLock();
+
+    nav.switchMode('orbit');
+
+    expect(fakeDocument.exitPointerLockCalls).toBe(1);
+    expect(nav.isPointerLocked).toBe(false);
   });
 });

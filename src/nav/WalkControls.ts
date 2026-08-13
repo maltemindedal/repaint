@@ -91,8 +91,16 @@ export class WalkControls {
     return this.position.clone().addScaledVector(dir, distance);
   }
 
-  get eye(): Vector3 {
-    return this.position;
+  /**
+   * Drops the eye to standing height above `floorY`, keeping the look direction.
+   *
+   * Reaches the camera immediately rather than waiting for the next `update()`:
+   * a pose read between the two would otherwise pair the old camera height with
+   * a target computed from the new one.
+   */
+  standAt(floorY: number): void {
+    this.position.y = floorY + this.eyeHeight;
+    this.applyToCamera();
   }
 
   // ------------------------------------------------------------- pointer

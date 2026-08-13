@@ -372,8 +372,8 @@ class App {
     }
     for (const light of this.scene?.lights ?? []) light.visible = s.punctualLights;
 
-    this.nav.walk.setEyeHeight(s.eyeHeight);
-    this.nav.walk.setSpeed(s.walkSpeed);
+    this.nav.setEyeHeight(s.eyeHeight);
+    this.nav.setWalkSpeed(s.walkSpeed);
     this.picker.highlightsEnabled = s.highlights;
     if (!s.highlights) this.picker.clearHighlights();
 
@@ -429,14 +429,7 @@ class App {
 
   private setMode(mode: NavMode): void {
     if (mode === this.nav.mode) return;
-    // Read the saved pose *before* switching. `setMode` emits twice: the
-    // outgoing mode's real pose first, then the carried-over camera pose for
-    // the incoming one — and that second emit overwrites the slot being read
-    // here. Reading first is what keeps it intact. (The carried-over emit is
-    // the defect issue #4 is about; it is still in place.)
-    const saved = this.store.getPose(mode);
-    this.nav.setMode(mode);
-    if (saved) this.nav.applyPose(saved);
+    this.nav.switchMode(mode, this.store.getPose(mode));
     this.toolbar.setMode(mode);
     this.panel.status(
       mode === 'walk'
@@ -482,11 +475,11 @@ class App {
         this.nav.frameScene();
         return;
       case 'KeyL':
-        if (this.nav.mode === 'walk') this.nav.walk.requestPointerLock();
+        this.nav.requestPointerLock();
         return;
       case 'Escape':
         if (this.help.isVisible) this.help.hide();
-        else if (this.nav.walk.isPointerLocked) this.nav.walk.exitPointerLock();
+        else if (this.nav.isPointerLocked) this.nav.exitPointerLock();
         else this.select(null);
         return;
       default:
