@@ -46,11 +46,19 @@ export class PaintRegistry {
   private byMaterial = new Map<MeshStandardMaterial, string>();
   private scratch = new Color();
 
+  // Both sorted views cost an Intl collation per comparison, and both change
+  // only when `discover` runs — but they are read on every sidebar render, so
+  // they are built once per discovery instead.
+  private sortedTargets: PaintTarget[] | null = null;
+  private sortedMaterials: MaterialInfo[] | null = null;
+
   /** Rebuilds from a scene graph. Safe to call again after re-tagging. */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
     const untagged = new Set(options.untagged ?? []);
 
+    this.sortedTargets = null;
+    this.sortedMaterials = null;
     this.groups.clear();
     root.traverse((obj) => {
       const mesh = obj as Mesh;
@@ -100,10 +108,16 @@ export class PaintRegistry {
     }
   }
 
+  /**
+   * The targets, display-name order. The array is shared and must be treated
+   * as read-only; the `PaintTarget`s in it are the live ones this registry
+   * mutates, so `currentHex` is always up to date.
+   */
   list(): PaintTarget[] {
-    return [...this.targets.values()].toSorted((a, b) =>
+    this.sortedTargets ??= [...this.targets.values()].toSorted((a, b) =>
       a.displayName.localeCompare(b.displayName, undefined, { numeric: true }),
     );
+    return this.sortedTargets;
   }
 
   get(key: string): PaintTarget | undefined {
@@ -114,9 +128,9 @@ export class PaintRegistry {
     return this.targets.size;
   }
 
-  /** Every material in the scene, for the manual-tagging list. */
+  /** Every material in the scene, for the manual-tagging list. Read-only. */
   allMaterials(): MaterialInfo[] {
-    return [...this.groups.values()]
+    this.sortedMaterials ??= [...this.groups.values()]
       .map((group) => ({
         name: group.name,
         isPaintable: this.targets.has(group.name),
@@ -125,6 +139,7 @@ export class PaintRegistry {
         meshCount: group.meshes.length,
       }))
       .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    return this.sortedMaterials;
   }
 
   /** Resolves a raycast hit back to the target that owns it. */

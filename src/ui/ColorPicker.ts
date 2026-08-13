@@ -149,11 +149,8 @@ export class ColorPicker {
   }
 
   /** A colour the user chose *here* — swatches move and `onChange` fires. */
-  setHex(hex: string): void {
-    const parsed = normalizeHex(hex);
-    if (!parsed) return;
-    this.hsv = hexToHsv(parsed);
-    this.sync(true);
+  private setHex(hex: string): void {
+    if (this.adoptHex(hex)) this.sync(true);
   }
 
   /**
@@ -163,10 +160,15 @@ export class ColorPicker {
    * sites to sync the picker *before* recording the change that caused it.
    */
   showHex(hex: string): void {
+    if (this.adoptHex(hex)) this.sync();
+  }
+
+  /** False when the text isn't a colour, in which case nothing moves. */
+  private adoptHex(hex: string): boolean {
     const parsed = normalizeHex(hex);
-    if (!parsed) return;
+    if (!parsed) return false;
     this.hsv = hexToHsv(parsed);
-    this.sync();
+    return true;
   }
 
   private sync(notify = false, keepInput = false): void {

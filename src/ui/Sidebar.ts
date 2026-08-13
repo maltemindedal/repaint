@@ -48,6 +48,9 @@ export interface SidebarViewModel {
   hoveredKey: string | null;
 }
 
+/** The sections `render` rebuilds wholesale rather than patching field by field. */
+type Section = 'schemes' | 'library' | 'materials';
+
 interface RowRefs {
   row: HTMLElement;
   swatch: HTMLElement;
@@ -101,17 +104,8 @@ export class Sidebar {
   private selectedKey: string | null = null;
   private hoveredKey: string | null = null;
 
-  // Sections whose contents come from the store are rebuilt wholesale, and the
-  // store hands back the same objects every render — renaming a scheme edits
-  // the very object the last render saw. So they diff against a snapshot of
-  // their own contents rather than against the reference they were given. A
-  // name is left out of the snapshot and written in place instead: it is the
-  // one field the user edits directly, and rebuilding around a live caret
-  // would drop them out of the field they are typing in.
-  private labelSig: string | null = null;
-  private schemesSig: string | null = null;
-  private librarySig: string | null = null;
-  private materialsSig: string | null = null;
+  private renderedLabel: string | null = null;
+  private snapshots = new Map<Section, string>();
 
   constructor(
     container: HTMLElement,
@@ -199,9 +193,27 @@ export class Sidebar {
     return section('Data', body, undefined, true);
   }
 
+  /**
+   * True when a wholesale-rebuilt section has actually moved.
+   *
+   * The store hands back the same objects on every render and mutates them in
+   * place — renaming a scheme edits the very object the last render saw — so a
+   * section can only be diffed against a snapshot of its own contents, never
+   * against the reference it was handed last time. Names are deliberately left
+   * out of the snapshot and written in place instead: they are the one field
+   * the user edits directly, and rebuilding around a live caret would drop
+   * them out of the field they are typing in.
+   */
+  private moved(name: Section, contents: unknown): boolean {
+    const snapshot = JSON.stringify(contents);
+    if (this.snapshots.get(name) === snapshot) return false;
+    this.snapshots.set(name, snapshot);
+    return true;
+  }
+
   private syncFileLabel(label: string): void {
-    if (label === this.labelSig) return;
-    this.labelSig = label;
+    if (label === this.renderedLabel) return;
+    this.renderedLabel = label;
     this.fileLabel.textContent = label;
     this.fileLabel.title = label;
   }
@@ -357,12 +369,10 @@ export class Sidebar {
   // ------------------------------------------------------------- schemes
 
   private syncSchemes(schemes: Scheme[], activeId: string | null): void {
-    const signature = JSON.stringify([activeId, schemes.map((s) => [s.id, s.colors])]);
-    if (signature === this.schemesSig) {
+    if (!this.moved('schemes', [activeId, schemes.map((s) => [s.id, s.colors])])) {
       writeNames(this.schemeInputs, schemes);
       return;
     }
-    this.schemesSig = signature;
     this.schemeInputs.clear();
 
     clear(this.schemesBody);
@@ -409,13 +419,16 @@ export class Sidebar {
   // ------------------------------------------------------------- library
 
   private syncLibrary(library: LibraryColor[]): void {
-    const signature = JSON.stringify(library.map((entry) => [entry.id, entry.hex]));
-    if (signature === this.librarySig) {
-      writeNames(this.libraryInputs, library);
-    } else {
-      this.librarySig = signature;
+    if (
+      this.moved(
+        'library',
+        library.map((entry) => [entry.id, entry.hex]),
+      )
+    ) {
       this.picker?.renderLibrary(library);
       this.buildLibrary(library);
+    } else {
+      writeNames(this.libraryInputs, library);
     }
     this.applyLibraryFocus();
   }
@@ -478,9 +491,7 @@ export class Sidebar {
   // ------------------------------------------------------------- tagging
 
   private syncMaterials(materials: MaterialInfo[]): void {
-    const signature = JSON.stringify(materials);
-    if (signature === this.materialsSig) return;
-    this.materialsSig = signature;
+    if (!this.moved('materials', materials)) return;
 
     clear(this.materialsBody);
     if (materials.length === 0) {

@@ -414,9 +414,21 @@ scene's geometry/texture/compression numbers.
 
 Vanilla three.js, not React Three Fiber. For a single-canvas tool with one imperative
 scene graph, R3F's reconciler adds a React dependency and a mental indirection layer
-without buying anything: there are no lists of components to diff, and the hot path
-(a colour write during a picker drag) wants to bypass a render loop, not go through
-one. The UI is small enough that plain DOM is less code than the React it'd replace.
+without buying anything: the hot path — a colour write during a picker drag — is a
+uniform upload straight to `material.color`, and it stays that way whatever the panels
+around it do. The UI is small enough that plain DOM is less code than the React it'd
+replace.
+
+The panels do diff, though, because they have to. `Sidebar` takes its whole state as
+one view model and works out what moved (`src/ui/Sidebar.ts`), and `Toolbar` skips a
+slot rebuild when the schemes are unchanged. That is deliberate and about 60 lines,
+not a reconciler: it exists so the app can re-render both panels after _every_
+mutation — including on each pointermove of a drag — instead of each call site
+remembering which half of the UI it was supposed to touch. Two rules keep it cheap:
+`PaintRegistry.list()` / `allMaterials()` are sorted once per discovery rather than
+per render (the sort is an Intl collation, and it was the whole cost), and a section
+is compared against a snapshot of its own contents, since the store mutates the
+objects it hands out in place.
 
 ```
 src/
@@ -447,7 +459,7 @@ src/
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
-  smoke.test.ts            22 tests over the fallback scene
+  smoke.test.ts            23 tests over the fallback scene
   sidebar.test.ts          16 tests over the sidebar's view model and diffing
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
