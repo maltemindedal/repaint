@@ -80,10 +80,18 @@ function makeHarness() {
   };
 
   const targetLists: string[][] = [];
+  let applyCount = 0;
   const session = new SceneSession(
     { camera, registry, picker, nav, store },
     {
-      applySettings: () => log.push('applySettings'),
+      applySettings: () => {
+        log.push('applySettings');
+        // Stands in for the one thing this direction answers back with: an
+        // eye height walk mode had to clamp reports the correction to
+        // `setSetting`, which writes whichever scene is current. Counting
+        // makes each load's write tellable from the last one's.
+        store.setSetting('eyeHeight', ++applyCount);
+      },
       targetsChanged: (targets: PaintTarget[]) => {
         targetLists.push(targets.map((t) => t.key));
         log.push('targetsChanged');
@@ -133,12 +141,18 @@ describe('scene activation order', () => {
     expect(nav.boundsAtPose).toBe(scene.bounds);
   });
 
-  it('applies settings only once the pose is final', () => {
-    const { log, session } = makeHarness();
+  it('pushes the store back out with the incoming scene current', () => {
+    const { log, session, store } = makeHarness();
 
-    session.load(makeScene());
+    session.load(makeScene({ key: 'first.glb' }));
+    session.load(makeScene({ key: 'second.glb' }));
 
-    // Guards: persisting a pose derived from the previous scene's camera.
+    // Guards: a correction the world reports back landing in the prefs of the
+    // scene we just navigated away from.
+    store.useScene('first.glb');
+    expect(store.scene.settings.eyeHeight).toBe(1);
+    store.useScene('second.glb');
+    expect(store.scene.settings.eyeHeight).toBe(2);
     expect(log.indexOf('applySettings')).toBeGreaterThan(log.indexOf('nav.applyPose'));
   });
 });

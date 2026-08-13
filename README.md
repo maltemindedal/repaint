@@ -304,7 +304,8 @@ this tool genuinely beats a paint chart; absolute colour accuracy is not.
   Can't drop below the floor. **Double-click any surface** to ease the pivot onto
   that point, which is how you get the camera to behave in a tight room.
 - **Walk** — `WASD`, `Shift` to move faster, `Q`/`E` or scroll for eye height,
-  drag to look. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
+  drag to look. Eye height is saved as you change it, so nothing stands you back
+  up. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
   While locked, clicking picks the wall under the centre of the screen. There's no
   collision (by design) — you're clamped to the scene's bounding box so you can't
   get lost.
@@ -436,8 +437,10 @@ src/
     fallbackScene.ts       Procedural demo room (also the smoke-test fixture)
   nav/
     NavigationController.ts  Mode switching, pose save/restore, double-click focus
-    WalkControls.ts          Damped first-person controls; settle-detection for
-                             persisting the walk pose after you stop moving
+    WalkControls.ts          Pointer/wheel/key listeners for first-person mode
+    WalkMotion.ts            DOM-free camera state machine: damped movement over
+                             keys/bounds, settle-detection for persisting the
+                             walk pose, and the one funnel for eye height
   state/
     store.ts               All persisted state, debounced writes
     storage.ts             localStorage + memory fallback; validating migration
@@ -451,6 +454,7 @@ test/
   smoke.test.ts            23 tests over the fallback scene
   sceneSession.test.ts     16 tests pinning the scene-activation order
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
+  walk-motion.test.ts        12 tests pinning eye-height ownership
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -465,9 +469,9 @@ it has nothing to write back.) That "only when stale" is what keeps a picker
 drag cheap: it fires a paint per pointermove, and rebuilding the toolbar scheme
 slots each time would undo the targeted row update the sidebar does.
 
-`processScene.ts`, `PaintRegistry.ts`, `PaintController.ts` and `SceneSession.ts`
-deliberately need no renderer, which is what lets the tests run the real pipeline
-headlessly in node:
+`processScene.ts`, `PaintRegistry.ts`, `PaintController.ts`, `SceneSession.ts` and
+`WalkMotion.ts` deliberately need no renderer, which is what lets the tests run the
+real pipeline headlessly in node:
 
 ```bash
 npm test

@@ -43,11 +43,13 @@ export interface SceneSessionDeps {
 
 export interface SceneSessionHooks {
   /**
-   * Push the store's settings into the world and the UI.
+   * Push the store's settings back out into the world and the UI.
    *
-   * Called from inside `load()`, at the one point in the sequence where it is
-   * safe: it sets the walk eye height, which emits a pose change, so running it
-   * before the new pose is in place persists the *previous* scene's camera.
+   * Called from inside `load()`, last, once the scene is fully assembled: this
+   * is the direction that *reads* the store, and some of what it pushes can
+   * answer back. A stored eye height walk mode has to clamp reports the
+   * correction straight to `setSetting`, which writes whichever scene is
+   * current — so this cannot run before the incoming scene's slot is.
    */
   applySettings(): void;
   /** The paint-target list changed: a load, a manual re-tag, or an import. */
