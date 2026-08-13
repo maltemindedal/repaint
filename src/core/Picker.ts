@@ -8,6 +8,7 @@ import {
   type Mesh,
   type MeshStandardMaterial,
 } from 'three';
+import { isMesh } from './materials.ts';
 import type { PaintRegistry } from './PaintRegistry.ts';
 import type { PaintTarget } from '../types.ts';
 import type { Viewer } from './Viewer.ts';
@@ -73,8 +74,7 @@ export class Picker {
     if (!root) return;
 
     root.traverse((obj) => {
-      const mesh = obj as Mesh;
-      if (mesh.isMesh) this.allMeshes.push(mesh);
+      if (isMesh(obj)) this.allMeshes.push(obj);
     });
     this.refreshTargets();
   }
@@ -91,9 +91,11 @@ export class Picker {
 
   private trackTarget(target: PaintTarget): void {
     if (this.highlightState.has(target.key)) return;
+    const firstMaterial = target.materials[0];
+    if (!firstMaterial) return;
     this.highlightState.set(target.key, {
       materials: target.materials,
-      emissive: target.materials[0].emissive.clone(),
+      emissive: firstMaterial.emissive.clone(),
     });
   }
 
@@ -154,8 +156,8 @@ export class Picker {
     this.raycaster.setFromCamera(this.pointer, this.viewer.camera);
     const hits = this.raycaster.intersectObjects(this.paintMeshes, false);
     for (const hit of hits) {
-      const mesh = hit.object as Mesh;
-      const target = this.registry.targetForMaterial(mesh.material);
+      if (!isMesh(hit.object)) continue;
+      const target = this.registry.targetForMaterial(hit.object.material);
       if (target) return target;
     }
     return null;

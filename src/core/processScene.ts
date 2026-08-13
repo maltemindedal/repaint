@@ -11,7 +11,7 @@ import {
 } from 'three';
 import type { CameraPose, SceneStats } from '../types.ts';
 import { START_CAM_NAME } from '../types.ts';
-import { isStandard, materialsOf } from './materials.ts';
+import { isLight, isMesh, isPerspectiveCamera, isStandard, materialsOf } from './materials.ts';
 
 /**
  * Renderer-free scene post-processing. Everything that has to happen to a
@@ -176,11 +176,11 @@ export function processScene(root: Object3D): ProcessResult {
   root.updateWorldMatrix(true, true);
 
   root.traverse((obj) => {
-    if ((obj as Light).isLight) lights.push(obj as Light);
+    if (isLight(obj)) lights.push(obj);
     if (isStartCamName(obj.name) && !startCamObject) startCamObject = obj;
 
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh) return;
+    if (!isMesh(obj)) return;
+    const mesh = obj;
 
     meshes++;
     const geometry = mesh.geometry;
@@ -202,7 +202,7 @@ export function processScene(root: Object3D): ProcessResult {
           'metalnessMap',
           'emissiveMap',
         ] as const) {
-          const tex = mat[key] as Texture | null;
+          const tex = mat[key];
           const source = tex?.source ?? tex?.image;
           if (tex && source && !seenSources.has(source)) {
             seenSources.add(source);
@@ -222,7 +222,7 @@ export function processScene(root: Object3D): ProcessResult {
   let startCam: CameraPose | null = null;
   let startCamFov: number | null = null;
   if (startCamObject) {
-    const cam = startCamObject as Object3D & { isCamera?: boolean; fov?: number };
+    const cam: Object3D = startCamObject;
     cam.updateWorldMatrix(true, false);
     const position = new Vector3().setFromMatrixPosition(cam.matrixWorld);
     // glTF cameras look down local -Z; Blender's exporter already baked the
@@ -230,7 +230,7 @@ export function processScene(root: Object3D): ProcessResult {
     const forward = new Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new Quaternion()));
     const target = position.clone().add(forward.multiplyScalar(3));
     startCam = { position: position.toArray(), target: target.toArray() };
-    if (cam.isCamera && typeof cam.fov === 'number') startCamFov = cam.fov;
+    if (isPerspectiveCamera(cam)) startCamFov = cam.fov;
   }
 
   return {

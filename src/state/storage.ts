@@ -76,8 +76,10 @@ function schemeList(value: unknown): AppData['scenes'][string]['schemes'] {
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue;
     const s = entry as Record<string, unknown>;
-    if (typeof s.id !== 'string' || typeof s.name !== 'string') continue;
-    out.push({ id: s.id, name: s.name, colors: stringRecord(s.colors) });
+    const id = s['id'];
+    const name = s['name'];
+    if (typeof id !== 'string' || typeof name !== 'string') continue;
+    out.push({ id, name, colors: stringRecord(s['colors']) });
   }
   return out;
 }
@@ -95,8 +97,8 @@ function poseMap(value: unknown): AppData['scenes'][string]['poses'] {
   for (const mode of ['orbit', 'walk'] as const) {
     const raw = (value as Record<string, unknown>)[mode];
     if (!raw || typeof raw !== 'object') continue;
-    const position = vec3((raw as Record<string, unknown>).position);
-    const target = vec3((raw as Record<string, unknown>).target);
+    const position = vec3((raw as Record<string, unknown>)['position']);
+    const target = vec3((raw as Record<string, unknown>)['target']);
     if (position && target) out[mode] = { position, target };
   }
   return out;
@@ -148,14 +150,15 @@ export function migrate(input: unknown): AppData {
     for (const [key, value] of Object.entries(raw.scenes)) {
       if (!value || typeof value !== 'object') continue;
       const p = value as unknown as Record<string, unknown>;
+      const activeSchemeId = p['activeSchemeId'];
       data.scenes[key] = {
-        tagged: stringList(p.tagged),
-        untagged: stringList(p.untagged),
-        schemes: schemeList(p.schemes),
-        activeSchemeId: typeof p.activeSchemeId === 'string' ? p.activeSchemeId : null,
-        poses: poseMap(p.poses),
-        settings: settingsPatch(p.settings),
-        current: stringRecord(p.current),
+        tagged: stringList(p['tagged']),
+        untagged: stringList(p['untagged']),
+        schemes: schemeList(p['schemes']),
+        activeSchemeId: typeof activeSchemeId === 'string' ? activeSchemeId : null,
+        poses: poseMap(p['poses']),
+        settings: settingsPatch(p['settings']),
+        current: stringRecord(p['current']),
       };
     }
   }

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
+import { must } from './helpers.ts';
 import { Sidebar, type SidebarCallbacks, type SidebarViewModel } from '../src/ui/Sidebar.ts';
 import type { Scheme } from '../src/types.ts';
 
@@ -90,7 +91,7 @@ describe('Sidebar paint list', () => {
       }),
     );
 
-    expect(ui.paintRows().map((r) => r.dataset.key)).toEqual(['PAINT_North', 'PAINT_South']);
+    expect(ui.paintRows().map((r) => r.dataset['key'])).toEqual(['PAINT_North', 'PAINT_South']);
     expect(ui.hexOf('PAINT_North')).toBe('#111111');
     expect(ui.host.querySelector('.sb-file')?.textContent).toBe('flat.glb');
   });
@@ -112,7 +113,7 @@ describe('Sidebar paint list', () => {
       viewModel({ targets: [row('PAINT_North', '#111111'), row('PAINT_South', '#222222')] }),
     );
 
-    expect(ui.paintRows().map((r) => r.dataset.key)).toEqual(['PAINT_North', 'PAINT_South']);
+    expect(ui.paintRows().map((r) => r.dataset['key'])).toEqual(['PAINT_North', 'PAINT_South']);
   });
 
   it('offers the tagging list when there is nothing to paint', () => {
@@ -204,7 +205,7 @@ describe('Sidebar colour picker', () => {
 describe('Sidebar schemes and library', () => {
   it('marks the active scheme, and lets go of it when the app clears it', () => {
     const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
-    expect(ui.schemeRows()[0].classList.contains('selected')).toBe(true);
+    expect(must(ui.schemeRows()[0]).classList.contains('selected')).toBe(true);
 
     // Painting a wall clears the active scheme; the row must follow.
     ui.sidebar.render(viewModel({ schemes: { schemes: schemes(), activeId: null } }));
@@ -214,7 +215,7 @@ describe('Sidebar schemes and library', () => {
 
   it('leaves an unchanged scheme list alone', () => {
     const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
-    const before = ui.schemeRows()[0];
+    const before = must(ui.schemeRows()[0]);
 
     ui.sidebar.render(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
 
@@ -223,9 +224,9 @@ describe('Sidebar schemes and library', () => {
 
   it('takes a rename without rebuilding the row it came from', () => {
     const renamed = schemes();
-    renamed[0].name = 'Warm white';
+    must(renamed[0]).name = 'Warm white';
     const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: null } }));
-    const before = ui.schemeNames()[0];
+    const before = must(ui.schemeNames()[0]);
 
     ui.sidebar.render(viewModel({ schemes: { schemes: renamed, activeId: null } }));
 
@@ -239,11 +240,12 @@ describe('Sidebar schemes and library', () => {
       { id: 'lib-2', name: 'Linen', hex: '#e8e4da' },
     ];
     const ui = mount(viewModel({ library }));
-    const [first, second] = ui.libraryNames();
+    const first = must(ui.libraryNames()[0]);
+    const second = must(ui.libraryNames()[1]);
 
     // The first entry's rename is committed; the user has tabbed on and is
     // half-way through the second. Any render at all — a 3D hover is enough.
-    library[0].name = 'Chalk white';
+    must(library[0]).name = 'Chalk white';
     second.focus();
     second.value = 'Linen w';
 
@@ -282,8 +284,8 @@ describe('Sidebar schemes and library', () => {
     const boxes = [...ui.host.querySelectorAll<HTMLInputElement>('.mat-row input')];
     expect(boxes.map((b) => b.checked)).toEqual([true, false]);
 
-    boxes[1].checked = true;
-    boxes[1].dispatchEvent(new Event('change'));
+    must(boxes[1]).checked = true;
+    must(boxes[1]).dispatchEvent(new Event('change'));
     expect(ui.cb.onTagChange).toHaveBeenCalledWith('Floor_Oak', true);
   });
 });

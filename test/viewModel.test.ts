@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { must } from './helpers.ts';
 import { createFallbackScene } from '../src/core/fallbackScene.ts';
 import { PaintRegistry } from '../src/core/PaintRegistry.ts';
 import { AppStore } from '../src/state/store.ts';
@@ -36,7 +37,7 @@ describe('sidebar view model', () => {
     // Mesh or Object3D hiding in here.
     expect(JSON.parse(JSON.stringify(vm))).toEqual(vm);
     expect(vm.targets.length).toBeGreaterThan(0);
-    expect(Object.keys(vm.targets[0]).toSorted()).toEqual([
+    expect(Object.keys(must(vm.targets[0])).toSorted()).toEqual([
       'currentHex',
       'displayName',
       'key',
@@ -75,7 +76,7 @@ describe('sidebar view model', () => {
     // One object, so the sidebar and the toolbar cannot disagree about it.
     expect(schemes.activeId).toBe('slot-2');
     expect(schemes.schemes.map((s) => s.id)).toEqual(['slot-1', 'slot-2', 'slot-3']);
-    expect(schemes.schemes[1].colors).toEqual({ PAINT_Living_North: '#e8e4da' });
+    expect(must(schemes.schemes[1]).colors).toEqual({ PAINT_Living_North: '#e8e4da' });
   });
 
   it('passes selection and hover through untouched', () => {

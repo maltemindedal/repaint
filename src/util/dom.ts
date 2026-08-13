@@ -15,7 +15,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     else if (k === 'html') node.innerHTML = String(v);
     else if (k === 'style') node.setAttribute('style', String(v));
     else if (k.startsWith('on') && typeof v === 'function') {
-      node.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
+      node.addEventListener(k.slice(2).toLowerCase(), v);
     } else if (v === true) node.setAttribute(k, '');
     else node.setAttribute(k, String(v));
   }
@@ -36,12 +36,18 @@ export function requireElement<T extends HTMLElement>(id: string): T {
   return node as T;
 }
 
+/** Like `requireElement`, but for a selector under a parent node. */
+export function requireQuery<T extends HTMLElement>(parent: ParentNode, selector: string): T {
+  const node = parent.querySelector<T>(selector);
+  if (!node) throw new Error(`Missing ${selector} in index.html`);
+  return node;
+}
+
 /** True when the user is typing, so global hotkeys should stand down. */
 export function isTypingTarget(target: EventTarget | null): boolean {
-  const node = target as HTMLElement | null;
-  if (!node) return false;
-  const tag = node.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || node.isContentEditable;
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

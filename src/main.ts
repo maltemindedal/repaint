@@ -24,6 +24,13 @@ import {
 } from './util/dom.ts';
 import type { AppliedSettingKey, LoadedScene, NavMode, SceneSettings } from './types.ts';
 
+declare global {
+  interface Window {
+    /** Dev-only console handle for poking at a scene that doesn't behave. */
+    apt?: App;
+  }
+}
+
 class App {
   private viewer: Viewer;
   private loader: SceneLoader;
@@ -141,7 +148,7 @@ class App {
     // Console handle for poking at a scene that doesn't behave — see README.
     // Dev-only so the production bundle keeps nothing alive that the UI doesn't.
     if (import.meta.env.DEV) {
-      (window as unknown as Record<string, unknown>).apt = this;
+      window.apt = this;
     }
   }
 

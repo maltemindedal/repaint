@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { must } from './helpers.ts';
 import { PointLight, SRGBColorSpace, type Box3, type Object3D } from 'three';
 import { createFallbackScene } from '../src/core/fallbackScene.ts';
 import { defaultPose, processScene } from '../src/core/processScene.ts';
@@ -261,7 +262,7 @@ describe('colour restore', () => {
 
     const target = registry.get('PAINT_Living_North')!;
     expect(target.currentHex).toBe('#abcdef');
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe('abcdef');
+    expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe('abcdef');
   });
 
   it('keeps live colours across a re-tag', () => {
@@ -278,7 +279,7 @@ describe('colour restore', () => {
     expect(registry.get('Floor_Oak')).toBeDefined();
     expect(registry.get('PAINT_Living_North')!.currentHex).toBe('#abcdef');
     expect(
-      registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace),
+      must(registry.get('PAINT_Living_North')!.materials[0]).color.getHexString(SRGBColorSpace),
     ).toBe('abcdef');
     // Same scene graph: the picker refreshes in place rather than resetting.
     expect(log).toEqual(['picker.refreshTargets', 'targetsChanged']);

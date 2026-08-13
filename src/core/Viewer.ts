@@ -11,6 +11,7 @@ import {
   type Texture,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { isMesh, materialsOf } from './materials.ts';
 
 export type FrameCallback = (dt: number, elapsed: number) => void;
 
@@ -94,9 +95,9 @@ export class Viewer {
     this.envTexture = target.texture;
     this.scene.environment = this.envTexture;
     room.traverse((obj) => {
-      const mesh = obj as { geometry?: { dispose(): void }; material?: { dispose(): void } };
-      mesh.geometry?.dispose();
-      mesh.material?.dispose();
+      if (!isMesh(obj)) return;
+      obj.geometry.dispose();
+      for (const mat of materialsOf(obj)) mat.dispose();
     });
   }
 
@@ -105,7 +106,11 @@ export class Viewer {
   }
 
   setBackground(hex: string): void {
-    (this.scene.background as Color).setStyle(hex, SRGBColorSpace);
+    if (this.scene.background instanceof Color) {
+      this.scene.background.setStyle(hex, SRGBColorSpace);
+    } else {
+      this.scene.background = new Color().setStyle(hex, SRGBColorSpace);
+    }
   }
 
   // -------------------------------------------------------- tone mapping

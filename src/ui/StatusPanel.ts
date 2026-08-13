@@ -1,4 +1,4 @@
-import { el, requireElement } from '../util/dom.ts';
+import { el, requireElement, requireQuery } from '../util/dom.ts';
 
 /**
  * The transient status toast and the loading overlay — all the ephemeral
@@ -11,10 +11,8 @@ import { el, requireElement } from '../util/dom.ts';
 export class StatusPanel {
   private statusEl = requireElement('status');
   private loadingEl = requireElement('loading');
-  private loadingFill =
-    requireElement<HTMLElement>('loading').querySelector<HTMLElement>('.loading-bar-fill')!;
-  private loadingLabel =
-    requireElement<HTMLElement>('loading').querySelector<HTMLElement>('.loading-label')!;
+  private loadingFill = requireQuery<HTMLElement>(this.loadingEl, '.loading-bar-fill');
+  private loadingLabel = requireQuery<HTMLElement>(this.loadingEl, '.loading-label');
 
   private displayTimer: ReturnType<typeof setTimeout> | null = null;
   private fadeTimer: ReturnType<typeof setTimeout> | null = null;

@@ -1,6 +1,6 @@
 import { Color, Mesh, MeshStandardMaterial, Object3D, SRGBColorSpace, type Material } from 'three';
 import { PAINT_PREFIX, type MaterialInfo, type PaintTarget } from '../types.ts';
-import { isStandard, materialsOf } from './materials.ts';
+import { isMesh, isStandard, materialsOf } from './materials.ts';
 
 /**
  * Discovers recolorable surfaces and owns every write to `material.color`.
@@ -93,9 +93,8 @@ export class PaintRegistry {
     this.sortedMaterials = null;
     this.groups.clear();
     root.traverse((obj) => {
-      const mesh = obj as Mesh;
-      if (!mesh.isMesh) return;
-      for (const mat of materialsOf(mesh)) {
+      if (!isMesh(obj)) return;
+      for (const mat of materialsOf(obj)) {
         if (!mat || !isStandard(mat) || !mat.name) continue;
         let group = this.groups.get(mat.name);
         if (!group) {
@@ -108,7 +107,7 @@ export class PaintRegistry {
           if (!this.originalHexes.has(mat.name)) this.originalHexes.set(mat.name, hexOf(mat.color));
         }
         if (!group.materials.includes(mat)) group.materials.push(mat);
-        if (!group.meshes.includes(mesh)) group.meshes.push(mesh);
+        if (!group.meshes.includes(obj)) group.meshes.push(obj);
         if (mat.map) group.hasColorMap = true;
       }
     });
@@ -121,7 +120,9 @@ export class PaintRegistry {
       const paintable = (auto && !untagged.has(group.name)) || tagged.has(group.name);
       if (!paintable) continue;
 
-      const live = hexOf(group.materials[0].color);
+      const firstMaterial = group.materials[0];
+      if (!firstMaterial) continue;
+      const live = hexOf(firstMaterial.color);
       const target: PaintTarget = {
         key: group.name,
         displayName: displayNameFor(group.name),

@@ -1,17 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023"],
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+
+    "allowJs": true,
+    "checkJs": true,
 
     "strict": true,
     "noUnusedLocals": true,
@@ -22,11 +21,10 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
-    "noPropertyAccessFromIndexSignature": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
 
-    "types": ["vite/client"]
+    "types": ["node"]
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["scripts/**/*.mjs", "test/fixtures/**/*.mjs"]
 }

@@ -23,21 +23,30 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------- PNG writer
 
+/** @type {Int32Array | null} */
+let crcTable = null;
+
+/** @param {Buffer} buf */
 function crc32(buf) {
-  let table = crc32.table;
-  if (!table) {
-    table = crc32.table = new Int32Array(256);
+  if (!crcTable) {
+    crcTable = new Int32Array(256);
     for (let n = 0; n < 256; n++) {
       let c = n;
       for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      table[n] = c;
+      crcTable[n] = c;
     }
   }
   let crc = -1;
-  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ table[(crc ^ buf[i]) & 0xff];
+  for (let i = 0; i < buf.length; i++) {
+    crc = (crc >>> 8) ^ (crcTable[(crc ^ (buf[i] ?? 0)) & 0xff] ?? 0);
+  }
   return (crc ^ -1) >>> 0;
 }
 
+/**
+ * @param {string} type
+ * @param {Buffer} data
+ */
 function chunk(type, data) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
@@ -47,7 +56,12 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-/** Minimal 8-bit RGB PNG encoder. */
+/**
+ * Minimal 8-bit RGB PNG encoder.
+ * @param {number} width
+ * @param {number} height
+ * @param {Buffer} rgb
+ */
 function encodePNG(width, height, rgb) {
   const raw = Buffer.alloc(height * (width * 3 + 1));
   for (let y = 0; y < height; y++) {
@@ -93,7 +107,12 @@ const W = 4.2;
 const D = 3.6;
 const H = 2.6;
 
-/** Bakes the transform into the vertices so every glTF node stays identity. */
+/**
+ * Bakes the transform into the vertices so every glTF node stays identity.
+ * @param {import('three').BufferGeometry} geometry
+ * @param {[number, number, number]} position
+ * @param {[number, number, number]} [rotation]
+ */
 function place(geometry, position, rotation = [0, 0, 0]) {
   const matrix = new Matrix4().compose(
     new Vector3(...position),
@@ -149,21 +168,32 @@ const parts = [
 
 // --------------------------------------------------------------- GLB assembly
 
+/** @type {Buffer[]} */
 const bin = [];
 let binLength = 0;
+/** @typedef {{ buffer: number, byteOffset: number, byteLength: number, target?: number }} BufferView */
+/** @typedef {{ bufferView: number, componentType: number, count: number, type: string, min?: number[], max?: number[] }} Accessor */
+/** @type {BufferView[]} */
 const bufferViews = [];
+/** @type {Accessor[]} */
 const accessors = [];
 
+/** @param {number} n */
 function pad4(n) {
   return (4 - (n % 4)) % 4;
 }
 
+/**
+ * @param {Buffer} buffer
+ * @param {number} [target]
+ */
 function addBufferView(buffer, target) {
   const padding = pad4(binLength);
   if (padding) {
     bin.push(Buffer.alloc(padding));
     binLength += padding;
   }
+  /** @type {BufferView} */
   const view = { buffer: 0, byteOffset: binLength, byteLength: buffer.length };
   if (target) view.target = target;
   bin.push(buffer);
@@ -175,6 +205,12 @@ function addBufferView(buffer, target) {
 const FLOAT = 5126;
 const USHORT = 5123;
 
+/**
+ * @param {number[]} array
+ * @param {'SCALAR' | 'VEC2' | 'VEC3'} type
+ * @param {number} componentType
+ * @param {number} [target]
+ */
 function addAccessor(array, type, componentType, target) {
   const buffer = Buffer.from(
     componentType === FLOAT ? Float32Array.from(array).buffer : Uint16Array.from(array).buffer,
@@ -183,15 +219,16 @@ function addAccessor(array, type, componentType, target) {
   const stride = { SCALAR: 1, VEC2: 2, VEC3: 3 }[type];
   const count = array.length / stride;
 
+  /** @type {Accessor} */
   const accessor = { bufferView: view, componentType, count, type };
   if (type === 'VEC3' && componentType === FLOAT) {
     const min = [Infinity, Infinity, Infinity];
     const max = [-Infinity, -Infinity, -Infinity];
     for (let i = 0; i < count; i++) {
       for (let c = 0; c < 3; c++) {
-        const v = array[i * 3 + c];
-        if (v < min[c]) min[c] = v;
-        if (v > max[c]) max[c] = v;
+        const v = array[i * 3 + c] ?? 0;
+        min[c] = Math.min(min[c] ?? Infinity, v);
+        max[c] = Math.max(max[c] ?? -Infinity, v);
       }
     }
     accessor.min = min;
@@ -202,17 +239,32 @@ function addAccessor(array, type, componentType, target) {
 }
 
 // glTF baseColorFactor is linear; the exporter does this conversion too.
+/** @param {number} c */
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
+/** @param {string} hex */
 const hexToFactor = (hex) => {
   const srgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   return [...srgb.map(toLinear), 1];
 };
 
 const imageView = addBufferView(png);
+/** @type {{ name: string, doubleSided: boolean, pbrMetallicRoughness: Record<string, unknown>, occlusionTexture: Record<string, unknown> }[]} */
 const materials = [];
+/** @type {{ name: string, primitives: Record<string, unknown>[] }[]} */
 const meshes = [];
+/** @type {Record<string, unknown>[]} */
 const nodes = [];
+
+/**
+ * @param {import('three').BufferGeometry} geometry
+ * @returns {import('three').BufferAttribute}
+ */
+function indexOf(geometry) {
+  const index = geometry.getIndex();
+  if (!index) throw new Error('Geometry is missing its index buffer');
+  return index;
+}
 
 for (const part of parts) {
   const g = part.geometry;
@@ -223,7 +275,7 @@ for (const part of parts) {
       TEXCOORD_0: addAccessor([...g.getAttribute('uv').array], 'VEC2', FLOAT, 34962),
       TEXCOORD_1: addAccessor([...g.getAttribute('uv1').array], 'VEC2', FLOAT, 34962),
     },
-    indices: addAccessor([...g.getIndex().array], 'SCALAR', USHORT, 34963),
+    indices: addAccessor([...indexOf(g).array], 'SCALAR', USHORT, 34963),
     material: materials.length,
     mode: 4,
   };
