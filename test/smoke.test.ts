@@ -168,16 +168,20 @@ describe('colour pipeline', () => {
     expect(registry.applyScheme({ PAINT_Nonexistent: '#000000' })).toBe(0);
   });
 
-  it('keeps applied colours across a re-discovery', () => {
+  it('re-reads the graph on discovery rather than re-applying what it last wrote', () => {
     const { root, registry } = buildScene();
     registry.setColor('PAINT_Living_North', '#abcdef');
+    // Move the material on behind the registry's back. The registry used to
+    // keep its own map of applied colours and push it back over the top here;
+    // restoring what was on screen belongs to the store instead, one level up
+    // — see test/sceneSession.test.ts.
+    registry.get('PAINT_Living_North')!.materials[0].color.setStyle('#123456', SRGBColorSpace);
 
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
-    expect(registry.get('PAINT_Living_North')!.currentHex).toBe('#abcdef');
-    expect(
-      registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace),
-    ).toBe('abcdef');
+    const target = registry.get('PAINT_Living_North')!;
+    expect(target.currentHex).toBe('#123456');
+    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe('123456');
   });
 });
 
@@ -239,6 +243,20 @@ describe('persistence', () => {
     expect(restored.schemes[1].colors).toEqual({ PAINT_Bedroom: '#c9c2b6' });
     expect(restored.library[0].name).toBe('Chalk');
     expect(restored.settings.exposure).toBe(1.4);
+  });
+
+  it('lets a guess fill a setting the user has not decided, and only that', () => {
+    const store = new AppStore(emptyData());
+    store.useScene('apartment.glb');
+
+    store.setDefaultSetting('punctualLights', true);
+    expect(store.settings.punctualLights).toBe(true);
+
+    // A guess never overrules a choice — including a choice that happens to
+    // equal the global default, which `settings` alone could not tell apart.
+    store.setSetting('aoMapIntensity', 0);
+    store.setDefaultSetting('aoMapIntensity', 1);
+    expect(store.settings.aoMapIntensity).toBe(0);
   });
 
   it('always hands back three keyboard-addressable scheme slots', () => {

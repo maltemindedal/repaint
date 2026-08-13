@@ -426,6 +426,8 @@ src/
   core/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
     SceneLoader.ts         GLB → LoadedScene, disposal, load report
+    SceneSession.ts        Scene activation: prefs, discovery, picker, camera —
+                           the activation order lives here, not in the caller
     loaders.ts             GLTFLoader + DRACO / KTX2 / meshopt
     processScene.ts        Renderer-free: lightmap wiring, bounds, START_CAM, stats
     PaintRegistry.ts       Discovery + the single write path for material.color
@@ -450,8 +452,9 @@ src/
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
-  smoke.test.ts            22 tests over the fallback scene
+  smoke.test.ts            23 tests over the fallback scene
   navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
+  sceneSession.test.ts     16 tests pinning the scene-activation order
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
   walk-motion.test.ts        12 tests pinning eye-height ownership
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
@@ -463,14 +466,14 @@ owns that fan-out so no _edit_ can do half of it: it writes the registry and
 the store, then emits one change carrying the targets that actually moved and,
 only when they went stale, the scheme rows to re-render. `main.ts` subscribes
 once and updates both views from there. (Restoring saved colours after a load
-goes straight to the registry — it is _reading_ the store, so it has nothing to
-write back.) That "only when stale" is what keeps a picker drag cheap: it fires
-a paint per pointermove, and rebuilding the toolbar scheme slots each time would
-undo the targeted row update the sidebar does.
+goes straight to the registry — `SceneSession` is _reading_ the store there, so
+it has nothing to write back.) That "only when stale" is what keeps a picker
+drag cheap: it fires a paint per pointermove, and rebuilding the toolbar scheme
+slots each time would undo the targeted row update the sidebar does.
 
-`processScene.ts`, `PaintRegistry.ts` and `PaintController.ts` deliberately need
-no renderer, which is what lets the tests run the real pipeline headlessly in
-node:
+`processScene.ts`, `PaintRegistry.ts`, `PaintController.ts`, `SceneSession.ts` and
+`WalkMotion.ts` deliberately need no renderer, which is what lets the tests run the
+real pipeline headlessly in node:
 
 ```bash
 npm test
@@ -481,8 +484,12 @@ write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised. The
 fan-out is covered against a fake store: which walls each operation reports, and
 that the scheme rows are asked to re-render exactly when the slots change and
-not once more. Whether `main.ts` then draws both views is browser-side and not
-covered here — the sidebar/toolbar seam is the next thing worth deepening.
+not once more. The session test drives a real registry and store against a
+recording picker and camera, so the activation order — store slot before
+settings, discovery before the picker, bounds before the pose, settings last —
+fails loudly if anyone reshuffles it. Whether `main.ts` then draws both views is
+browser-side and not covered here — the sidebar/toolbar seam is the next thing
+worth deepening.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):
