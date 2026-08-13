@@ -23,6 +23,8 @@ export class NavigationController {
 
   onModeChange: ((mode: NavMode) => void) | null = null;
   onPoseChange: ((mode: NavMode, pose: CameraPose) => void) | null = null;
+  /** Walk mode moved the eye height — tell whoever persists it. */
+  onEyeHeightChange: ((value: number) => void) | null = null;
 
   constructor(private viewer: Viewer) {
     this.orbit = new OrbitControls(viewer.camera, viewer.canvas);
@@ -41,7 +43,8 @@ export class NavigationController {
     this.walk.enabled = false;
 
     this.orbit.addEventListener('end', () => this.emitPose());
-    this.walk.onChange = () => this.emitPose();
+    this.walk.onPoseSettled = () => this.emitPose();
+    this.walk.onEyeHeightChange = (value) => this.onEyeHeightChange?.(value);
   }
 
   // ---------------------------------------------------------------- mode
@@ -57,10 +60,9 @@ export class NavigationController {
     if (mode === 'walk') {
       this.orbit.enabled = false;
       this.walk.enabled = true;
+      // Stands at eye height where the camera already is — walk mode owns that
+      // arithmetic, so it isn't repeated out here.
       this.walk.syncFromCamera();
-      // Stand at eye height where the camera already is.
-      const eye = this.walk.eye;
-      eye.y = this.floorY + this.walk.eyeHeight;
       this.viewer.canvas.classList.add('walk-mode');
     } else {
       this.walk.enabled = false;
@@ -174,8 +176,14 @@ export class NavigationController {
     }
   }
 
+  /** A user-driven change: walk mode reports it back out. */
   setEyeHeight(value: number): void {
     this.walk.setEyeHeight(value);
+  }
+
+  /** A stored height arriving from outside: taken silently, not reported back. */
+  adoptEyeHeight(value: number): void {
+    this.walk.adoptEyeHeight(value);
   }
 
   setWalkSpeed(value: number): void {

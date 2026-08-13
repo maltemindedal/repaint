@@ -20,7 +20,13 @@ import {
   requireElement,
   pickFile,
 } from './util/dom.ts';
-import type { LoadedScene, NavMode, SchemeView, SceneSettings } from './types.ts';
+import type {
+  AppliedSettingKey,
+  LoadedScene,
+  NavMode,
+  SchemeView,
+  SceneSettings,
+} from './types.ts';
 
 class App {
   private viewer: Viewer;
@@ -96,6 +102,7 @@ class App {
 
     this.nav.onModeChange = (mode) => this.toolbar.setMode(mode);
     this.nav.onPoseChange = (mode, pose) => this.store.setPose(mode, pose);
+    this.nav.onEyeHeightChange = (value) => this.storeEyeHeight(value);
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pagehide', () => this.store.flush());
@@ -208,6 +215,7 @@ class App {
     const savedPose = this.store.getPose(this.nav.mode);
     this.nav.applyPose(savedPose ?? scene.startCam ?? defaultPose(scene.bounds));
 
+    this.seedEyeHeight();
     this.applySettings();
     this.sidebar.setFileLabel(scene.label);
     this.sidebar.renderMaterials(this.registry.allMaterials());
@@ -348,6 +356,7 @@ class App {
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.renderSchemes();
     this.renderLibrary();
+    this.seedEyeHeight();
     this.applySettings();
   }
 
@@ -378,7 +387,9 @@ class App {
     }
     for (const light of this.scene?.lights ?? []) light.visible = s.punctualLights;
 
-    this.nav.setEyeHeight(s.eyeHeight);
+    // Eye height is deliberately absent: walk mode moves it (wheel, Q/E) and
+    // reports back, so pushing the stored value here would undo whatever the
+    // user just did every time any other setting changed.
     this.nav.setWalkSpeed(s.walkSpeed);
     this.picker.highlightsEnabled = s.highlights;
     if (!s.highlights) this.picker.clearHighlights();
@@ -387,9 +398,35 @@ class App {
     this.debug.syncSettings(s);
   }
 
-  private setSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
+  private setSetting<K extends AppliedSettingKey>(key: K, value: SceneSettings[K]): void {
     this.store.setSetting(key, value);
     this.applySettings();
+  }
+
+  /**
+   * The one direction eye height flows *into* walk mode: a scene (or an
+   * imported file) arrives carrying a height this session hasn't seen. Every
+   * other change runs the other way, through `storeEyeHeight`.
+   *
+   * `adoptEyeHeight`, not `setEyeHeight`, because this value came *from* the
+   * store — reporting it back would write a height into the prefs of every
+   * scene merely opened, quietly opting it out of the default for ever.
+   */
+  private seedEyeHeight(): void {
+    this.nav.adoptEyeHeight(this.store.settings.eyeHeight);
+  }
+
+  /**
+   * Walk mode is the live owner of eye height while you're in it — the wheel,
+   * Q/E and the debug slider all move it there — and the store is the owner of
+   * the persisted value. This is the seam between them. It writes the store
+   * directly rather than going through `setSetting`, which would re-apply every
+   * setting on every wheel tick and push the value straight back into the
+   * module that just moved it.
+   */
+  private storeEyeHeight(value: number): void {
+    this.store.setSetting('eyeHeight', value);
+    this.debug.syncSettings(this.store.settings);
   }
 
   private toggleToneMapping(): void {
@@ -406,8 +443,12 @@ class App {
   private debugHooks() {
     return {
       settings: this.store.settings,
-      setSetting: <K extends keyof SceneSettings>(key: K, value: SceneSettings[K]) =>
+      setSetting: <K extends AppliedSettingKey>(key: K, value: SceneSettings[K]) =>
         this.setSetting(key, value),
+      // Not `setSetting`: the slider is one more way to move the height walk
+      // mode owns, so it goes in the same way the wheel does and comes back out
+      // through `onEyeHeightChange`.
+      setEyeHeight: (value: number) => this.nav.setEyeHeight(value),
       setBackground: (hex: string) => this.viewer.setBackground(hex),
       setMaxPixelRatio: (value: number) => this.viewer.setMaxPixelRatio(value),
       frameScene: () => this.nav.frameScene(),

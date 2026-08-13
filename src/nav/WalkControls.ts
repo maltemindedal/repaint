@@ -1,4 +1,5 @@
-import { Box3, Euler, MathUtils, PerspectiveCamera, Vector3 } from 'three';
+import { Box3, PerspectiveCamera, Vector3 } from 'three';
+import { WalkMotion } from './WalkMotion.ts';
 import { isTypingTarget } from '../util/dom.ts';
 
 /**
@@ -10,48 +11,31 @@ import { isTypingTarget } from '../util/dom.ts';
  *
  * No collision — as specified. Movement is clamped to the scene bounding box
  * (slightly inset) so you can't wander off into the void.
+ *
+ * This half is only input: pointer, wheel and key events become calls on a
+ * `WalkMotion`, which holds the camera state and can be stepped without a DOM.
+ * The state half is forwarded rather than exposed, so callers keep asking one
+ * object about walk mode instead of learning which of the two halves to reach
+ * for.
  */
 
-const UP = new Vector3(0, 1, 0);
+/** Metres of eye height per unit of wheel delta. */
+const WHEEL_TO_METRES = 0.0012;
 
 export class WalkControls {
   enabled = false;
 
-  eyeHeight = 1.65;
-  speed = 2.4;
-  sprintMultiplier = 3;
-  lookSensitivity = 0.0022;
-  /** 0 = no smoothing, 1 = never arrives. Applied per 60 Hz frame. */
-  damping = 0.82;
-
-  private yaw = 0;
-  private pitch = 0;
-  private targetYaw = 0;
-  private targetPitch = 0;
-
-  private position = new Vector3();
-  private velocity = new Vector3();
-  private keys = new Set<string>();
-  private euler = new Euler(0, 0, 0, 'YXZ');
-
+  private motion: WalkMotion;
   private dragging = false;
   private pointerLocked = false;
-  private bounds: Box3 | null = null;
-
-  // Pose-change tracking: WASD and mouse-look mutate the camera every frame,
-  // so instead of emitting per frame, note the movement and emit once after a
-  // short quiet period. Without this, walking somewhere is never persisted.
-  private lastEmitted = { x: NaN, y: NaN, z: NaN, yaw: NaN, pitch: NaN };
-  private quietFor = 0;
-  private poseDirty = false;
-
-  /** Fired when the pose has settled after movement, and on eye-height changes. */
-  onChange: (() => void) | null = null;
+  private lastPointer = { x: 0, y: 0 };
 
   constructor(
-    private camera: PerspectiveCamera,
+    camera: PerspectiveCamera,
     private domElement: HTMLElement,
   ) {
+    this.motion = new WalkMotion(camera);
+
     domElement.addEventListener('pointerdown', this.onPointerDown);
     domElement.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('pointermove', this.onPointerMove);
@@ -64,40 +48,68 @@ export class WalkControls {
 
   // --------------------------------------------------------------- state
 
+  /** Fired once the pose has settled after movement. */
+  get onPoseSettled(): (() => void) | null {
+    return this.motion.onPoseSettled;
+  }
+
+  set onPoseSettled(handler: (() => void) | null) {
+    this.motion.onPoseSettled = handler;
+  }
+
+  /** Fired for every eye-height change, wherever it came from. */
+  get onEyeHeightChange(): ((value: number) => void) | null {
+    return this.motion.onEyeHeightChange;
+  }
+
+  set onEyeHeightChange(handler: ((value: number) => void) | null) {
+    this.motion.onEyeHeightChange = handler;
+  }
+
+  get speed(): number {
+    return this.motion.speed;
+  }
+
+  set speed(value: number) {
+    this.motion.speed = value;
+  }
+
+  // Read-only, unlike `speed`: every write has to pick a direction, so it goes
+  // through `setEyeHeight` (reported outward) or `adoptEyeHeight` (silent).
+  get eyeHeight(): number {
+    return this.motion.eyeHeight;
+  }
+
+  setEyeHeight(value: number): void {
+    this.motion.setEyeHeight(value);
+  }
+
+  adoptEyeHeight(value: number): void {
+    this.motion.adoptEyeHeight(value);
+  }
+
   setBounds(bounds: Box3 | null): void {
-    this.bounds = bounds;
+    this.motion.setBounds(bounds);
   }
 
   /** Adopts the camera's current transform, so mode switches don't jump. */
   syncFromCamera(): void {
-    this.position.copy(this.camera.position);
-    this.euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-    this.yaw = this.targetYaw = this.euler.y;
-    this.pitch = this.targetPitch = this.euler.x;
-    this.velocity.set(0, 0, 0);
+    this.motion.syncFromCamera();
   }
 
   setPose(position: Vector3, target: Vector3): void {
-    this.position.copy(position);
-    const dir = target.clone().sub(position);
-    this.targetYaw = this.yaw = Math.atan2(-dir.x, -dir.z);
-    this.targetPitch = this.pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
-    this.velocity.set(0, 0, 0);
-    this.applyToCamera();
+    this.motion.setPose(position, target);
   }
 
   getTargetPoint(distance = 3): Vector3 {
-    const dir = new Vector3(0, 0, -1).applyEuler(new Euler(this.pitch, this.yaw, 0, 'YXZ'));
-    return this.position.clone().addScaledVector(dir, distance);
+    return this.motion.getTargetPoint(distance);
   }
 
   get eye(): Vector3 {
-    return this.position;
+    return this.motion.eye;
   }
 
   // ------------------------------------------------------------- pointer
-
-  private lastPointer = { x: 0, y: 0 };
 
   private onPointerDown = (event: PointerEvent): void => {
     if (!this.enabled || event.button !== 0) return;
@@ -108,24 +120,17 @@ export class WalkControls {
   private onPointerMove = (event: PointerEvent): void => {
     if (!this.enabled) return;
     if (this.pointerLocked) {
-      this.applyLook(event.movementX, event.movementY);
+      this.motion.applyLook(event.movementX, event.movementY);
       return;
     }
     if (!this.dragging) return;
-    this.applyLook(event.clientX - this.lastPointer.x, event.clientY - this.lastPointer.y);
+    this.motion.applyLook(event.clientX - this.lastPointer.x, event.clientY - this.lastPointer.y);
     this.lastPointer = { x: event.clientX, y: event.clientY };
   };
 
   private onPointerUp = (): void => {
     this.dragging = false;
   };
-
-  private applyLook(dx: number, dy: number): void {
-    this.targetYaw -= dx * this.lookSensitivity;
-    this.targetPitch -= dy * this.lookSensitivity;
-    const limit = Math.PI / 2 - 0.02;
-    this.targetPitch = MathUtils.clamp(this.targetPitch, -limit, limit);
-  }
 
   requestPointerLock(): void {
     if (!this.enabled) return;
@@ -149,28 +154,23 @@ export class WalkControls {
   private onWheel = (event: WheelEvent): void => {
     if (!this.enabled) return;
     event.preventDefault();
-    this.setEyeHeight(this.eyeHeight - event.deltaY * 0.0012);
+    this.motion.nudgeEyeHeight(-event.deltaY * WHEEL_TO_METRES);
   };
-
-  setEyeHeight(value: number): void {
-    this.eyeHeight = MathUtils.clamp(value, 0.2, 6);
-    this.onChange?.();
-  }
 
   // ---------------------------------------------------------------- keys
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (isTypingTarget(event.target)) return;
-    this.keys.add(event.code);
+    this.motion.keys.add(event.code);
     if (this.enabled && MOVE_CODES.has(event.code)) event.preventDefault();
   };
 
   private onKeyUp = (event: KeyboardEvent): void => {
-    this.keys.delete(event.code);
+    this.motion.keys.delete(event.code);
   };
 
   private onBlur = (): void => {
-    this.keys.clear();
+    this.motion.keys.clear();
     this.dragging = false;
   };
 
@@ -178,105 +178,7 @@ export class WalkControls {
 
   update(dt: number): void {
     if (!this.enabled) return;
-
-    // Frame-rate independent exponential smoothing.
-    const lerp = 1 - Math.pow(1 - this.damping, dt * 60);
-
-    this.yaw = MathUtils.lerp(this.yaw, this.targetYaw, lerp);
-    this.pitch = MathUtils.lerp(this.pitch, this.targetPitch, lerp);
-
-    const forward =
-      Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) -
-      Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
-    const strafe =
-      Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) -
-      Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
-    const rise = Number(this.keys.has('KeyE')) - Number(this.keys.has('KeyQ'));
-
-    if (rise !== 0) this.setEyeHeight(this.eyeHeight + rise * dt * 1.1);
-
-    const sprint = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
-    const speed = this.speed * (sprint ? this.sprintMultiplier : 1);
-
-    // Walk on the ground plane: looking up shouldn't launch you upward.
-    const dir = new Vector3();
-    if (forward !== 0 || strafe !== 0) {
-      const ahead = new Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-      const right = new Vector3().crossVectors(ahead, UP).normalize();
-      dir.addScaledVector(ahead, forward).addScaledVector(right, strafe).normalize();
-    }
-
-    const desired = dir.multiplyScalar(speed);
-    this.velocity.lerp(desired, 1 - Math.pow(0.0016, dt));
-    this.position.addScaledVector(this.velocity, dt);
-
-    if (this.bounds) {
-      const pad = 0.25;
-      this.position.x = MathUtils.clamp(
-        this.position.x,
-        this.bounds.min.x - pad,
-        this.bounds.max.x + pad,
-      );
-      this.position.z = MathUtils.clamp(
-        this.position.z,
-        this.bounds.min.z - pad,
-        this.bounds.max.z + pad,
-      );
-      this.position.y = this.bounds.min.y + this.eyeHeight;
-    } else {
-      this.position.y = this.eyeHeight;
-    }
-
-    this.applyToCamera();
-    this.trackPoseSettled(dt);
-  }
-
-  /** Emits `onChange` once the camera has been still for a beat. */
-  private trackPoseSettled(dt: number): void {
-    const last = this.lastEmitted;
-
-    // First frame: record a baseline without treating it as movement.
-    // (NaN never compares true, so without this the check below is inert.)
-    if (Number.isNaN(last.x)) {
-      this.recordPose();
-      return;
-    }
-
-    const moved =
-      Math.abs(this.position.x - last.x) > 1e-4 ||
-      Math.abs(this.position.y - last.y) > 1e-4 ||
-      Math.abs(this.position.z - last.z) > 1e-4 ||
-      Math.abs(this.yaw - last.yaw) > 1e-4 ||
-      Math.abs(this.pitch - last.pitch) > 1e-4;
-
-    if (moved) {
-      this.poseDirty = true;
-      this.quietFor = 0;
-      this.recordPose();
-      return;
-    }
-
-    if (!this.poseDirty) return;
-    this.quietFor += dt;
-    if (this.quietFor >= 0.5) {
-      this.poseDirty = false;
-      this.onChange?.();
-    }
-  }
-
-  private recordPose(): void {
-    const last = this.lastEmitted;
-    last.x = this.position.x;
-    last.y = this.position.y;
-    last.z = this.position.z;
-    last.yaw = this.yaw;
-    last.pitch = this.pitch;
-  }
-
-  private applyToCamera(): void {
-    this.camera.position.copy(this.position);
-    this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
-    this.camera.quaternion.setFromEuler(this.euler);
+    this.motion.update(dt);
   }
 
   dispose(): void {
