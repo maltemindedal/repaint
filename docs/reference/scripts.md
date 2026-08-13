@@ -33,10 +33,10 @@ at the first.
 
 ## Tests
 
-| Script            | Runs         | Notes                                                             |
-| ----------------- | ------------ | ----------------------------------------------------------------- |
-| `pnpm test`       | `vitest run` | 94 tests across 7 files. Runs in plain node — no browser, no GPU. |
-| `pnpm test:watch` | `vitest`     | Watch mode.                                                       |
+| Script            | Runs         | Notes                                                                                                                                            |
+| ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test`       | `vitest run` | The whole suite, in plain node — no browser, no GPU. Per-file breakdown: [architecture/overview.md](../architecture/overview.md#testable-seams). |
+| `pnpm test:watch` | `vitest`     | Watch mode.                                                                                                                                      |
 
 ## Not a package script
 

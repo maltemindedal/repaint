@@ -83,7 +83,7 @@ puts you back where you last stood.
 | Setting                           | Value                                       | Why                                                                                           |
 | --------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | **Format**                        | `glTF Binary (.glb)`                        | One self-contained file with textures packed in.                                              |
-| **Include → Selected Objects**    | off (or on, deliberately)                   | Easy way to ship a single room.                                                               |
+| **Include → Selected Objects**    | off (or on, deliberately)                   | Ships a single room without touching the rest of the file.                                    |
 | **Include → Cameras**             | **on**                                      | Needed for `START_CAM`.                                                                       |
 | **Include → Punctual Lights**     | your call                                   | The app loads them but leaves them **off** when it detects a bake. Toggle in the debug panel. |
 | **Transform → +Y Up**             | **on** (the default)                        | Converts Blender's Z-up. Leave it alone.                                                      |
@@ -108,9 +108,9 @@ three.js r180 the loaders resolve their own WASM through
   `pnpm dlx @gltf-transform/cli uastc in.glb out.glb`, or `etc1s` for smaller
   files. This is the single biggest VRAM win for a lightmap-heavy apartment.
 
-One caveat: the DRACO and KTX2 decoders are WASM fetched on demand, and `fetch()`
-is blocked on the `file://` protocol. Compressed files therefore need a served
-build, not the double-clickable single-file build. See
+One caveat: Draco- and KTX2-compressed files cannot load from the double-clickable
+single-file build — they need a served copy of the app. Why, and which paths still
+work, is covered in
 [Deploying](deploying.md#the-portable-single-file-build).
 
 ## Check the file before you debug the app

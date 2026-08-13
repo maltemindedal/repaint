@@ -1,7 +1,5 @@
 # Repaint
 
-[![CI](https://github.com/maltemindedal/repaint/actions/workflows/ci.yml/badge.svg)](https://github.com/maltemindedal/repaint/actions/workflows/ci.yml)
-
 A local, client-side 3D viewer for a Blender apartment export. Walk around, click
 a wall, paste a paint hex, and flip between colour schemes while standing in the
 same spot.
@@ -10,10 +8,9 @@ Choosing wall paint from a chart is guesswork: a 3 cm swatch under shop lighting
 tells you very little about four square metres of wall under your own windows.
 Repaint loads your apartment with its Cycles lighting baked in, lets you recolour
 any wall by hex, and binds whole colour schemes to <kbd>1</kbd> / <kbd>2</kbd> /
-<kbd>3</kbd> so you can A/B them from a fixed viewpoint.
-
-Nothing leaves your machine: no backend, no uploads, no analytics. Your GLB is
-read with `FileReader` and stays in the tab.
+<kbd>3</kbd> so you can A/B them from a fixed viewpoint. Nothing leaves your
+machine — no backend, no uploads, no analytics; your GLB is read with
+`FileReader` and stays in the tab.
 
 ## Quick start
 
@@ -28,9 +25,16 @@ pnpm install
 pnpm dev
 ```
 
-Vite opens <http://localhost:5173>. You get a small procedurally generated demo
-room — two walls, a ceiling, a floor and a fake baked gradient — so the whole UI
-is usable before you have an export ready.
+```text
+  VITE v8.2.1  ready in 769 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
+
+A browser tab opens on that URL with a small procedurally generated demo room —
+two walls, a ceiling, a floor and a fake baked gradient — so the whole UI is
+usable before you have an export ready.
 
 Hover a wall, click it, and paste a hex into the sidebar picker. The hex box
 accepts anything containing a hex, so a whole product name works:
@@ -97,13 +101,8 @@ Full index: **[docs/README.md](docs/README.md)**
 ## Project structure
 
 ```text
-src/
-  core/       Viewer, loading, scene processing, paint registry, picking
-  nav/        Orbit ⇄ walk navigation and the DOM-free walk state machine
-  state/      Persisted store and validating localStorage layer
-  ui/         Sidebar, colour picker, toolbar, debug panel, overlays
-  util/       sRGB hex helpers and small DOM helpers
-test/         94 tests, headless node; fixtures/ generates a sample GLB
+src/          The app: rendering core, navigation, persisted state, plain-DOM UI
+test/         Headless node test suite; fixtures/ generates a sample GLB
 scripts/      make-portable.mjs — folds dist/ into one HTML file
 docs/         All documentation (see the index above)
 ```

@@ -44,9 +44,9 @@ on screen.
 
 ## Contributing
 
-| Document                        | What it covers                                                                                                  |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [Contributing](contributing.md) | Dev setup, the pre-push check, test conventions, code style, PR conventions, and how to keep these docs in sync |
+| Document                        | What it covers                                                                                                  | For                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| [Contributing](contributing.md) | Dev setup, the pre-push check, test conventions, code style, PR conventions, and how to keep these docs in sync | Anyone opening a PR against this repo |
 
 ## Conventions used here
 

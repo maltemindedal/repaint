@@ -24,9 +24,9 @@ Or build the double-clickable single file with `pnpm build:portable` — see
 
 ### A compressed `.glb` fails to load from the portable file
 
-DRACO and KTX2 decoders are WASM fetched on demand, and `fetch()` is blocked on
-`file://`. The app logs this specific warning when it detects the situation. Use
-the served build for Draco/KTX2 files.
+Draco and KTX2 files cannot decode on `file://`; the app logs a warning when it
+detects the situation. Use the served build for those files — the explanation is
+in [Deploying](deploying.md#the-portable-single-file-build).
 
 ### "Only .glb / .gltf (or a settings .json) can be dropped here"
 

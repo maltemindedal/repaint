@@ -10,8 +10,9 @@ pnpm install
 pnpm dev
 ```
 
-pnpm 11.10.0 is pinned by the `packageManager` field, so `corepack enable` gets
-you the right version. CI runs Node 24.x; nothing enforces that locally.
+pnpm is pinned by the `packageManager` field, so `corepack enable` gets you the
+right version. The exact toolchain versions, and where each is pinned, are the
+table in [reference/scripts.md § Toolchain versions](reference/scripts.md#toolchain-versions).
 
 pnpm blocks dependency build scripts by default. `pnpm-workspace.yaml` allows
 exactly one — esbuild's postinstall, which unpacks the platform binary Vite and
@@ -35,11 +36,11 @@ Full script list: [reference/scripts.md](reference/scripts.md).
 
 ## Tests
 
-94 tests across 7 files, all in `test/`, all running in plain node — no browser,
-no GPU. That is a property worth protecting: five modules
-(`processScene.ts`, `PaintRegistry.ts`, `PaintController.ts`, `SceneSession.ts`,
-`WalkMotion.ts`) are deliberately renderer-free so the real pipeline can be
-exercised headlessly.
+The whole suite lives in `test/` and runs in plain node — no browser, no GPU.
+That is a property worth protecting: the core and nav modules it exercises are
+deliberately renderer-free, so the real pipeline runs headlessly. The per-file
+breakdown, and which seams each file pins, is the table in
+[architecture/overview.md § Testable seams](architecture/overview.md#testable-seams).
 
 - Anything needing a `document` opts in per file with a
   `@vitest-environment happy-dom` docblock, as `sidebar.test.ts` does. The suite

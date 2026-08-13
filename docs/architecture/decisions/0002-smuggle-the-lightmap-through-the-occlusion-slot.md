@@ -63,8 +63,8 @@ default of 0 would silently disable the only effect available to them.
   explicitly and the app has to detect when they don't.
 - The bake must land on `TEXCOORD_1`. When a mesh claims it but ships no second
   UV set, the app copies `uv` into `uv1` and warns, rather than rendering the wall
-  black — a fallback that exists purely because this path is easy to get wrong in
-  Blender.
+  black — a fallback that exists purely because authors frequently miss this step
+  in Blender.
 
 ## See also
 

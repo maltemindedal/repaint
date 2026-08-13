@@ -4,8 +4,8 @@ Blender's glTF exporter has **no lightmap slot**. This guide covers the way
 around it: bake to a second UV set, smuggle the bake out through the
 **occlusion** input, and let Repaint re-route it into three.js's `lightMap`.
 
-Baking is optional. A scene without one still works — it just relies on the
-exported punctual lights and the environment map instead.
+Baking is optional. A scene without one still works — it relies on the exported
+punctual lights and the environment map instead.
 
 Assumes you have already read [Preparing a Blender scene](preparing-a-blender-scene.md).
 
@@ -23,8 +23,8 @@ For each object that should carry baked light:
    margin of `0.02`–`0.05` stops light bleeding between islands at low
    resolutions.
 
-> Doing this for many objects: select them all, make the active object the one
-> you just set up, then **Object → Link/Transfer Data → Copy UV Maps**. Verify
+> Doing this for many objects: select them all, make the active object one you
+> have already set up, then **Object → Link/Transfer Data → Copy UV Maps**. Verify
 > per object afterwards — it only works cleanly for matching topology.
 
 ## 2. Add the bake target image
@@ -77,46 +77,31 @@ texture with roughness (green) and metallic (blue). If your material also has
 roughness/metallic image textures, the exporter may pack all three into one
 image — and then green and blue hold roughness and metallic, not light.
 
-The app detects this (the slots share a texture source), falls back to using the
-texture as plain ambient occlusion, and says so in the console. For real baked
-lighting, keep the bake as a standalone image and leave roughness and metallic as
-plain values.
+When that happens, Repaint uses the texture as plain ambient occlusion instead of
+a lightmap and says so in the console — the detection mechanics are in
+[ADR 0002 § The ORM exception](../architecture/decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md#the-orm-exception).
+For real baked lighting, keep the bake as a standalone image and leave roughness
+and metallic as plain values.
 
 ## What the app does with it on import
 
-For a standalone bake, Repaint:
-
-- takes the glTF occlusion texture (GLTFLoader puts it in `material.aoMap`),
-- flags it **sRGB** — a Cycles bake saved as PNG/JPG is sRGB-encoded, and reading
-  it as linear data would wash the room out,
-- assigns it to **`material.lightMap`**, which samples full RGB and multiplies
-  into diffuse irradiance, which is what baked light _is_,
-- and points `material.aoMap` at the **same texture instance** with
-  **`aoMapIntensity = 0`**.
-
-That last part is deliberate: feeding one texture into both slots at full
-strength multiplies the occlusion in twice and gives you muddy corners. Both
-intensities are sliders in the debug panel (<kbd>`</kbd>), so if you baked pure
-AO rather than diffuse light, push **AO intensity** up and **Lightmap intensity**
-down.
-
-For the reasoning in full, see
+For a standalone bake, Repaint flags the occlusion texture sRGB and re-routes it
+into `material.lightMap`, with ambient occlusion zeroed so the bake is not
+multiplied in twice. The exact four-step wiring, and the reasoning behind each
+step, lives in
 [ADR 0002: smuggle the lightmap through the occlusion slot](../architecture/decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md).
+
+What matters while authoring: both intensities are sliders in the debug panel
+(<kbd>`</kbd>), so if you baked pure AO rather than diffuse light, push **AO
+intensity** up and **Lightmap intensity** down.
 
 ## Why the default lightmap intensity is π, not 1
 
-three.js adds the lightmap to `irradiance`, and `RE_IndirectDiffuse_Physical`
-then multiplies that by `BRDF_Lambert() = albedo / π`. A Cycles Diffuse or
-Combined bake already stores outgoing radiance for a white surface — the answer
-_before_ that division.
-
-Leaving the intensity at 1 makes the room come out π times too dark, which people
-usually compensate for by cranking exposure and wrecking the colours. Setting it
-to π puts the division back, so a bake value of "fully lit" renders as your paint
-colour at full brightness. The slider range is 0–6 if your bake was exposed
-differently.
-
-See [ADR 0003](../architecture/decisions/0003-default-lightmap-intensity-is-pi.md).
+A Cycles bake stores light _after_ the `albedo / π` division that three.js
+applies on its own, so passing it through at intensity 1 renders the room π times
+too dark — the full derivation is
+[ADR 0003](../architecture/decisions/0003-default-lightmap-intensity-is-pi.md).
+The slider ranges 0–6 if your bake was exposed differently.
 
 ## Troubleshooting a bake
 
