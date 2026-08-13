@@ -156,9 +156,12 @@ describe('per-scene defaults', () => {
       makeScene({ key: 'baked.glb', lights: [new PointLight()], hasBakedTextures: true }),
     );
 
-    const scenes = store.snapshot().scenes;
-    expect(scenes['lit.glb'].settings.punctualLights).toBe(true);
-    expect(scenes['baked.glb'].settings.punctualLights).toBe(false);
+    // Each guess landed in its own file's slot, and loading the second scene
+    // left the first one's alone.
+    store.useScene('baked.glb');
+    expect(store.scene.settings.punctualLights).toBe(false);
+    store.useScene('lit.glb');
+    expect(store.scene.settings.punctualLights).toBe(true);
   });
 
   it('leaves punctual lights alone once the user has made the call', () => {

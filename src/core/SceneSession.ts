@@ -148,6 +148,10 @@ export class SceneSession {
 
     const prefs = store.scene;
     registry.discover(scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
+
+    // Straight to the registry, not through `PaintController`: this reads
+    // *from* the store, so writing back would only re-save it — and drop the
+    // active scheme, as if the user had hand-painted every wall.
     for (const [key, hex] of Object.entries(store.currentColors)) registry.setColor(key, hex);
   }
 }
