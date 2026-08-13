@@ -3,7 +3,7 @@ import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
 import { Picker } from './core/Picker.ts';
-import { defaultPose } from './core/processScene.ts';
+import { SceneSession } from './core/SceneSession.ts';
 import { NavigationController } from './nav/NavigationController.ts';
 import { AppStore } from './state/store.ts';
 import { Sidebar } from './ui/Sidebar.ts';
@@ -20,7 +20,7 @@ import {
   requireElement,
   pickFile,
 } from './util/dom.ts';
-import type { LoadedScene, NavMode, SchemeView, SceneSettings } from './types.ts';
+import type { LoadedScene, NavMode, PaintTarget, SchemeView, SceneSettings } from './types.ts';
 
 class App {
   private viewer: Viewer;
@@ -29,13 +29,13 @@ class App {
   private picker: Picker;
   private nav: NavigationController;
   private store = new AppStore();
+  private session: SceneSession;
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
   private debug: DebugPanel;
   private help: HelpOverlay;
 
-  private scene: LoadedScene | null = null;
   private selectedKey: string | null = null;
   private perfChecked = false;
   private loadedAt = 0;
@@ -49,6 +49,19 @@ class App {
     this.loader = new SceneLoader(this.viewer);
     this.picker = new Picker(this.viewer, this.registry);
     this.nav = new NavigationController(this.viewer);
+    this.session = new SceneSession(
+      {
+        camera: this.viewer.camera,
+        registry: this.registry,
+        picker: this.picker,
+        nav: this.nav,
+        store: this.store,
+      },
+      {
+        applySettings: () => this.applySettings(),
+        targetsChanged: (targets) => this.renderTargets(targets),
+      },
+    );
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
@@ -170,45 +183,17 @@ class App {
     if (file) await this.handleFile(file);
   }
 
+  /** The scene on screen. `SceneSession` owns making it so. */
+  private get scene(): LoadedScene | null {
+    return this.session.scene;
+  }
+
   private setScene(scene: LoadedScene): void {
-    this.scene = scene;
     this.perfChecked = false;
     this.loadedAt = performance.now();
 
-    this.store.useScene(scene.key);
+    this.session.load(scene);
 
-    // Baked scenes shouldn't be double-lit, but a scene *without* a bake
-    // clearly wants its exported lights on. Only guess when the user hasn't
-    // already made a call for this file.
-    if (this.store.scene.settings.punctualLights === undefined && scene.lights.length > 0) {
-      this.store.setSetting('punctualLights', !scene.hasBakedTextures);
-    }
-
-    // ORM-packed occlusion can't drive a lightmap, so for those materials the
-    // AO slider is the whole effect. The global default of 0 (right for
-    // lightmapped scenes, where the bake already contains its occlusion) would
-    // silently disable it — give this file a default of 1 unless the user has
-    // already chosen a value.
-    if (
-      this.store.scene.settings.aoMapIntensity === undefined &&
-      scene.aoOnlyMaterials.length > 0
-    ) {
-      this.store.setSetting('aoMapIntensity', 1);
-    }
-
-    this.rediscover();
-    this.picker.setScene(scene.root);
-
-    this.nav.setBounds(scene.bounds);
-    if (scene.startCamFov) {
-      this.viewer.camera.fov = scene.startCamFov;
-      this.viewer.camera.updateProjectionMatrix();
-    }
-
-    const savedPose = this.store.getPose(this.nav.mode);
-    this.nav.applyPose(savedPose ?? scene.startCam ?? defaultPose(scene.bounds));
-
-    this.applySettings();
     this.sidebar.setFileLabel(scene.label);
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.renderSchemes();
@@ -219,19 +204,9 @@ class App {
     }
   }
 
-  /** Re-runs discovery (after load, or after a manual tag change). */
-  private rediscover(): void {
-    if (!this.scene) return;
-    const prefs = this.store.scene;
-    this.registry.discover(this.scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
-
-    // Restore whatever colours were on screen last time.
-    for (const [key, hex] of Object.entries(this.store.currentColors)) {
-      this.registry.setColor(key, hex);
-    }
-
-    this.picker.refreshTargets();
-    this.sidebar.renderPaintTargets(this.registry.list(), this.store.library);
+  /** The session's paint targets changed: after a load, a tag, or an import. */
+  private renderTargets(targets: PaintTarget[]): void {
+    this.sidebar.renderPaintTargets(targets, this.store.library);
     if (this.selectedKey && !this.registry.get(this.selectedKey)) this.selectedKey = null;
     this.sidebar.setSelected(this.selectedKey, false);
   }
@@ -344,7 +319,7 @@ class App {
   }
 
   private refreshAll(): void {
-    this.rediscover();
+    this.session.rediscover();
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.renderSchemes();
     this.renderLibrary();
@@ -356,7 +331,7 @@ class App {
   private setTag(materialName: string, tagged: boolean): void {
     const info = this.registry.allMaterials().find((m) => m.name === materialName);
     this.store.setTagged(materialName, tagged, info?.auto ?? false);
-    this.rediscover();
+    this.session.rediscover();
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.status(`${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`);
   }

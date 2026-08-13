@@ -425,6 +425,8 @@ src/
   core/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
     SceneLoader.ts         GLB → LoadedScene, disposal, load report
+    SceneSession.ts        Scene activation: prefs, discovery, picker, camera —
+                           the ordering lives here, so callers just load()
     loaders.ts             GLTFLoader + DRACO / KTX2 / meshopt
     processScene.ts        Renderer-free: lightmap wiring, bounds, START_CAM, stats
     PaintRegistry.ts       Discovery + the single write path for material.color
@@ -446,19 +448,24 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
+  sceneSession.test.ts     16 tests pinning the scene-activation order
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
-`processScene.ts` and `PaintRegistry.ts` deliberately need no renderer, which is
-what lets the smoke test run the real pipeline headlessly in node:
+`processScene.ts`, `PaintRegistry.ts` and `SceneSession.ts` deliberately need no
+renderer, which is what lets the tests run the real pipeline headlessly in node:
 
 ```bash
 npm test
 ```
 
-It builds the procedural room, runs discovery against it, and checks the colour
-write path, scheme capture/apply, name cleanup, persistence round-trips, the
-ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
+The smoke test builds the procedural room, runs discovery against it, and checks
+the colour write path, scheme capture/apply, name cleanup, persistence
+round-trips, the ORM-vs-lightmap classification, and that corrupt saved data is
+sanitised. The session test drives a real registry and store against a recording
+picker and camera, so the activation order — store slot before settings,
+discovery before the picker, bounds before the pose, settings last — fails
+loudly if anyone reshuffles it.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

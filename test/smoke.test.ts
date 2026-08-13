@@ -168,16 +168,20 @@ describe('colour pipeline', () => {
     expect(registry.applyScheme({ PAINT_Nonexistent: '#000000' })).toBe(0);
   });
 
-  it('keeps applied colours across a re-discovery', () => {
+  it('re-reads the graph on discovery rather than re-applying what it last wrote', () => {
     const { root, registry } = buildScene();
     registry.setColor('PAINT_Living_North', '#abcdef');
+    // Move the material on behind the registry's back. The registry used to
+    // keep its own map of applied colours and push it back over the top here;
+    // restoring what was on screen belongs to the store instead, one level up
+    // — see test/sceneSession.test.ts.
+    registry.get('PAINT_Living_North')!.materials[0].color.setStyle('#123456', SRGBColorSpace);
 
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
-    expect(registry.get('PAINT_Living_North')!.currentHex).toBe('#abcdef');
-    expect(
-      registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace),
-    ).toBe('abcdef');
+    const target = registry.get('PAINT_Living_North')!;
+    expect(target.currentHex).toBe('#123456');
+    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe('123456');
   });
 });
 
