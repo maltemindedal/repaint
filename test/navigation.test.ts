@@ -45,6 +45,13 @@ interface Harness {
   emitted: { mode: NavMode; pose: CameraPose }[];
   /** Drops what's been recorded so far — used to ignore a mode entry's own emit. */
   resetEmitted(): void;
+  /**
+   * Restores the globals. There is no controller teardown to do: #6 deleted
+   * `dispose()` from both nav classes as untested fiction, and nothing here
+   * needs it — every harness builds its own stub window, document and canvas,
+   * so the listeners a discarded controller leaves behind are attached to
+   * objects that die with it.
+   */
   dispose(): void;
 }
 
@@ -96,10 +103,7 @@ function makeHarness(): Harness {
       win,
       emitted,
       resetEmitted: () => void (emitted.length = 0),
-      dispose: () => {
-        nav.dispose();
-        restore();
-      },
+      dispose: restore,
     };
   } catch (error) {
     restore();

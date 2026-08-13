@@ -30,7 +30,6 @@ export class DebugPanel {
   private visible = false;
   private proxy: Record<string, unknown>;
   private infoControllers: { name: string; get: () => string }[] = [];
-  private infoTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private hooks: DebugHooks) {
     this.gui = new GUI({ title: 'Debug  ·  ` to hide', width: 300 });
@@ -152,7 +151,7 @@ export class DebugPanel {
       { name: 'lights', get: () => (this.hooks.hasPunctualLights() ? 'in file' : 'none') },
     ];
     // lil-gui `.listen()` polls the object, so refresh it on a slow timer.
-    this.infoTimer = setInterval(() => {
+    setInterval(() => {
       for (const item of this.infoControllers) {
         (info as Record<string, string>)[item.name] = item.get();
       }
@@ -217,12 +216,5 @@ export class DebugPanel {
 
   get isVisible(): boolean {
     return this.visible;
-  }
-
-  dispose(): void {
-    if (this.infoTimer) clearInterval(this.infoTimer);
-    this.infoTimer = null;
-    this.gui.destroy();
-    this.stats.dom.remove();
   }
 }

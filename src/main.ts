@@ -2,6 +2,7 @@ import './style.css';
 import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
+import { PaintController, type PaintChange } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
 import { defaultPose } from './core/processScene.ts';
 import { NavigationController } from './nav/NavigationController.ts';
@@ -29,6 +30,7 @@ class App {
   private picker: Picker;
   private nav: NavigationController;
   private store = new AppStore();
+  private paint = new PaintController(this.registry, this.store);
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
@@ -52,7 +54,7 @@ class App {
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
-      onColorChange: (key, hex) => this.setColor(key, hex),
+      onColorChange: (key, hex) => this.paint.apply(key, hex),
       onResetTarget: (key) => this.resetTarget(key),
       onResetAll: () => this.resetAll(),
       onTagChange: (name, tagged) => this.setTag(name, tagged),
@@ -90,6 +92,8 @@ class App {
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
+    this.paint.onPaintChanged = (change) => this.renderPaintChange(change);
+
     this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
     this.picker.onDoubleClick = (point) => this.nav.focusPoint(point);
@@ -110,7 +114,7 @@ class App {
 
     this.setScene(this.loader.loadFallback());
     this.viewer.start();
-    this.status('Drop a .glb anywhere to load your apartment. Press ? for shortcuts.', 6000);
+    this.panel.status('Drop a .glb anywhere to load your apartment. Press ? for shortcuts.', 6000);
 
     // Console handle for poking at a scene that doesn't behave — see README.
     // Dev-only so the production bundle keeps nothing alive that the UI doesn't.
@@ -128,26 +132,26 @@ class App {
       try {
         this.store.importJSON(await file.text(), 'merge');
         this.refreshAll();
-        this.status(`Imported settings from ${file.name}`);
+        this.panel.status(`Imported settings from ${file.name}`);
       } catch (err) {
         console.error(err);
-        this.status(`Could not read ${file.name} as settings JSON`, 5000);
+        this.panel.status(`Could not read ${file.name} as settings JSON`, 5000);
       }
       return;
     }
 
     if (!name.endsWith('.glb') && !name.endsWith('.gltf')) {
-      this.status('Only .glb / .gltf (or a settings .json) can be dropped here.', 4000);
+      this.panel.status('Only .glb / .gltf (or a settings .json) can be dropped here.', 4000);
       return;
     }
 
-    this.showLoading(0, 'Reading file…');
+    this.panel.showLoading(0, 'Reading file…');
     try {
       const scene = await this.loader.loadFile(file, (fraction, label) =>
-        this.showLoading(fraction, label),
+        this.panel.showLoading(fraction, label),
       );
       this.setScene(scene);
-      this.status(
+      this.panel.status(
         `${file.name} — ${this.registry.size} paintable ${this.registry.size === 1 ? 'material' : 'materials'}`,
         5000,
       );
@@ -159,9 +163,9 @@ class App {
             'If this file is compressed, use the served build (npm run serve:dist).',
         );
       }
-      this.status(`Could not load ${file.name}. See the console for details.`, 6000);
+      this.panel.status(`Could not load ${file.name}. See the console for details.`, 6000);
     } finally {
-      this.hideLoading();
+      this.panel.hideLoading();
     }
   }
 
@@ -215,7 +219,7 @@ class App {
     this.renderLibrary();
 
     if (!scene.isFallback && this.registry.size === 0) {
-      this.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
+      this.panel.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
     }
   }
 
@@ -225,7 +229,9 @@ class App {
     const prefs = this.store.scene;
     this.registry.discover(this.scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
 
-    // Restore whatever colours were on screen last time.
+    // Restore whatever colours were on screen last time. Straight to the
+    // registry, not through PaintController: this reads *from* the store, so
+    // writing back would only re-save it and drop the active scheme.
     for (const [key, hex] of Object.entries(this.store.currentColors)) {
       this.registry.setColor(key, hex);
     }
@@ -238,36 +244,33 @@ class App {
 
   // -------------------------------------------------------------- colour
 
-  private setColor(key: string, hex: string): void {
-    if (!this.registry.setColor(key, hex)) return;
-    this.store.setCurrentColor(key, hex);
-    this.store.setActiveScheme(null);
-    this.toolbar.renderSchemes({ schemes: this.store.schemes, activeId: null });
+  /**
+   * The single place a paint change reaches the views. Every repaint — picker
+   * drag, library click, scheme, reset — arrives here, so no call site can
+   * update half the UI and leave the other half stale.
+   */
+  private renderPaintChange(change: PaintChange): void {
+    for (const [key, hex] of change.colors) this.sidebar.updateTarget(key, hex);
+
+    const selectedHex = this.selectedKey ? change.colors.get(this.selectedKey) : undefined;
+    if (selectedHex) this.sidebar.syncPicker(selectedHex);
+
+    // Only when the slots or the active one actually moved — a picker drag
+    // fires this dozens of times a second and must not rebuild them.
+    if (change.schemes) this.renderSchemes(change.schemes);
   }
 
   private resetTarget(key: string): void {
-    const target = this.registry.get(key);
+    const target = this.paint.reset(key);
     if (!target) return;
-    this.registry.resetColor(key);
-    this.store.clearCurrentColor(key);
-    this.sidebar.updateTarget(key, target.currentHex);
-    if (this.selectedKey === key) this.sidebar.syncPicker(target.currentHex);
-    this.status(`${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`);
+    this.panel.status(
+      `${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`,
+    );
   }
 
   private resetAll(): void {
-    this.registry.resetAll();
-    for (const target of this.registry.list()) {
-      this.store.clearCurrentColor(target.key);
-      this.sidebar.updateTarget(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(null);
-    this.renderSchemes();
-    this.status('All walls back to their exported colours');
+    this.paint.resetAll();
+    this.panel.status('All walls back to their exported colours');
   }
 
   private select(key: string | null): void {
@@ -284,59 +287,48 @@ class App {
     if (!entry) return;
     this.sidebar.focusLibraryEntry(entry.id);
     this.renderLibrary();
-    this.status('Saved to library — type a name in the sidebar');
+    this.panel.status('Saved to library — type a name in the sidebar');
   }
 
   private applyLibraryColor(id: string): void {
     const entry = this.store.library.find((c) => c.id === id);
     if (!entry) return;
     if (!this.selectedKey) {
-      this.status('Select a wall first, then click a library colour.', 3500);
+      this.panel.status('Select a wall first, then click a library colour.', 3500);
       return;
     }
-    this.setColor(this.selectedKey, entry.hex);
-    this.sidebar.updateTarget(this.selectedKey, entry.hex);
-    this.sidebar.syncPicker(entry.hex);
-    this.status(`${entry.name} applied`);
+    if (!this.paint.apply(this.selectedKey, entry.hex)) return;
+    this.panel.status(`${entry.name} applied`);
   }
 
   // ------------------------------------------------------------- schemes
 
   private applyScheme(id: string): void {
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    if (!scheme) return;
-    const count = Object.keys(scheme.colors).length;
-    if (count === 0) {
-      this.status(`“${scheme.name}” is empty — use “Save current” to fill it.`, 4000);
+    const result = this.paint.applyScheme(id);
+    if (result.outcome === 'missing') return;
+    if (result.outcome === 'empty') {
+      this.panel.status(`“${result.scheme.name}” is empty — use “Save current” to fill it.`, 4000);
       return;
     }
-
-    const applied = this.registry.applyScheme(scheme.colors);
-    for (const target of this.registry.list()) {
-      this.sidebar.updateTarget(target.key, target.currentHex);
-      this.store.setCurrentColor(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    this.status(`${scheme.name} — ${applied}/${count} colours applied`);
+    this.panel.status(
+      `${result.scheme.name} — ${result.applied}/${result.requested} colours applied`,
+    );
   }
 
   private captureScheme(id: string): void {
-    this.store.saveScheme(id, this.registry.capture());
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    this.status(`Saved current colours into “${scheme?.name ?? id}”`);
+    const scheme = this.paint.capture(id);
+    if (!scheme) return;
+    this.panel.status(`Saved current colours into “${scheme.name}”`);
   }
 
-  private renderSchemes(): void {
-    const view: SchemeView = { schemes: this.store.schemes, activeId: this.store.activeSchemeId };
-    this.toolbar.renderSchemes(view);
-    this.sidebar.renderSchemes(view);
+  /** Both scheme views, always together. Defaults to whatever the store holds. */
+  private renderSchemes(view?: SchemeView): void {
+    const next: SchemeView = view ?? {
+      schemes: this.store.schemes,
+      activeId: this.store.activeSchemeId,
+    };
+    this.toolbar.renderSchemes(next);
+    this.sidebar.renderSchemes(next);
   }
 
   private renderLibrary(): void {
@@ -358,7 +350,9 @@ class App {
     this.store.setTagged(materialName, tagged, info?.auto ?? false);
     this.rediscover();
     this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.status(`${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`);
+    this.panel.status(
+      `${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`,
+    );
   }
 
   // ------------------------------------------------------------ settings
@@ -378,8 +372,8 @@ class App {
     }
     for (const light of this.scene?.lights ?? []) light.visible = s.punctualLights;
 
-    this.nav.setEyeHeight(s.eyeHeight);
-    this.nav.setWalkSpeed(s.walkSpeed);
+    this.nav.walk.setEyeHeight(s.eyeHeight);
+    this.nav.walk.setSpeed(s.walkSpeed);
     this.picker.highlightsEnabled = s.highlights;
     if (!s.highlights) this.picker.clearHighlights();
 
@@ -395,7 +389,7 @@ class App {
   private toggleToneMapping(): void {
     const next = !this.store.settings.toneMapping;
     this.setSetting('toneMapping', next);
-    this.status(
+    this.panel.status(
       next
         ? 'ACES filmic tone mapping ON — looks like your Cycles render'
         : 'Tone mapping OFF — on-screen colour now matches the hex literally',
@@ -444,7 +438,7 @@ class App {
     this.nav.setMode(mode);
     if (saved) this.nav.applyPose(saved);
     this.toolbar.setMode(mode);
-    this.status(
+    this.panel.status(
       mode === 'walk'
         ? 'Walk mode — WASD to move, drag to look, L for pointer lock'
         : 'Orbit mode — drag to orbit, double-click to set the pivot',
@@ -476,7 +470,7 @@ class App {
       }
       case 'KeyR':
         if (this.selectedKey) this.resetTarget(this.selectedKey);
-        else this.status('Select a wall first (click it, or pick it in the sidebar).', 3000);
+        else this.panel.status('Select a wall first (click it, or pick it in the sidebar).', 3000);
         return;
       case 'KeyT':
         this.toggleToneMapping();
@@ -516,15 +510,15 @@ class App {
         .replace(/(^-|-$)/g, '') || 'custom';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-    this.status('Rendering 2× screenshot…');
+    this.panel.status('Rendering 2× screenshot…');
     const blob = await this.viewer.screenshot(2);
     if (!blob) {
-      this.status('Screenshot failed — the drawing buffer came back empty.', 4000);
+      this.panel.status('Screenshot failed — the drawing buffer came back empty.', 4000);
       return;
     }
     const filename = `repaint_${slug}_${stamp}.png`;
     downloadBlob(blob, filename);
-    this.status(`Saved ${filename}`, 4000);
+    this.panel.status(`Saved ${filename}`, 4000);
   }
 
   // -------------------------------------------------------- import/export
@@ -532,7 +526,7 @@ class App {
   private exportData(): void {
     const stamp = new Date().toISOString().slice(0, 10);
     downloadText(this.store.exportJSON(), `repaint-${stamp}.json`);
-    this.status('Exported schemes, library and settings');
+    this.panel.status('Exported schemes, library and settings');
   }
 
   private async importData(): Promise<void> {
@@ -541,10 +535,10 @@ class App {
     try {
       this.store.importJSON(await file.text(), 'merge');
       this.refreshAll();
-      this.status(`Imported ${file.name}`);
+      this.panel.status(`Imported ${file.name}`);
     } catch (err) {
       console.error(err);
-      this.status('That file is not a valid Repaint export.', 5000);
+      this.panel.status('That file is not a valid Repaint export.', 5000);
     }
   }
 
@@ -586,19 +580,7 @@ class App {
       lines.push(`  · ${stats.meshes} draw calls. Join meshes that share a material in Blender.`);
     }
     console.warn(lines.join('\n'));
-    this.status(`~${fps.toFixed(0)} fps — see the console for compression hints.`, 6000);
-  }
-
-  private status(message: string, duration = 2600): void {
-    this.panel.status(message, duration);
-  }
-
-  private showLoading(fraction: number, label: string): void {
-    this.panel.showLoading(fraction, label);
-  }
-
-  private hideLoading(): void {
-    this.panel.hideLoading();
+    this.panel.status(`~${fps.toFixed(0)} fps — see the console for compression hints.`, 6000);
   }
 }
 
