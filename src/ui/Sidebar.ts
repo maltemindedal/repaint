@@ -1,7 +1,7 @@
 import { el, clear } from '../util/dom.ts';
 import { ColorPicker } from './ColorPicker.ts';
 import { miniSwatches } from './swatches.ts';
-import type { LibraryColor, MaterialInfo, Scheme } from '../types.ts';
+import type { LibraryColor, MaterialInfo, SchemeView } from '../types.ts';
 
 export interface SidebarCallbacks {
   onSelect: (key: string | null) => void;
@@ -36,14 +36,14 @@ export interface PaintRow {
   currentHex: string;
 }
 
-/** Everything the sidebar draws. */
+/** Everything the sidebar draws. Built by `sidebarViewModel()`. */
 export interface SidebarViewModel {
   fileLabel: string;
   targets: PaintRow[];
   materials: MaterialInfo[];
   library: LibraryColor[];
-  schemes: Scheme[];
-  activeId: string | null;
+  /** Slots and which one is live — the same view the toolbar renders from. */
+  schemes: SchemeView;
   selectedKey: string | null;
   hoveredKey: string | null;
 }
@@ -158,7 +158,7 @@ export class Sidebar {
     this.syncSelection(vm.selectedKey, rebuilt);
     this.syncHover(vm.hoveredKey);
     this.syncPickerHex(vm.targets);
-    this.syncSchemes(vm.schemes, vm.activeId);
+    this.syncSchemes(vm.schemes);
     this.syncLibrary(vm.library);
     this.syncMaterials(vm.materials);
   }
@@ -368,7 +368,7 @@ export class Sidebar {
 
   // ------------------------------------------------------------- schemes
 
-  private syncSchemes(schemes: Scheme[], activeId: string | null): void {
+  private syncSchemes({ schemes, activeId }: SchemeView): void {
     if (!this.moved('schemes', [activeId, schemes.map((s) => [s.id, s.colors])])) {
       writeNames(this.schemeInputs, schemes);
       return;

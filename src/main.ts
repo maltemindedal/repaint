@@ -6,7 +6,8 @@ import { Picker } from './core/Picker.ts';
 import { defaultPose } from './core/processScene.ts';
 import { NavigationController } from './nav/NavigationController.ts';
 import { AppStore } from './state/store.ts';
-import { Sidebar, type SidebarViewModel } from './ui/Sidebar.ts';
+import { Sidebar } from './ui/Sidebar.ts';
+import { sidebarViewModel } from './sidebarViewModel.ts';
 import { Toolbar } from './ui/Toolbar.ts';
 import { DropZone } from './ui/DropZone.ts';
 import { DebugPanel } from './ui/DebugPanel.ts';
@@ -20,7 +21,7 @@ import {
   requireElement,
   pickFile,
 } from './util/dom.ts';
-import type { LoadedScene, NavMode, SchemeView, SceneSettings } from './types.ts';
+import type { LoadedScene, NavMode, SceneSettings } from './types.ts';
 
 class App {
   private viewer: Viewer;
@@ -320,41 +321,24 @@ class App {
   // -------------------------------------------------------------- views
 
   /**
-   * Everything the sidebar draws, as one plain object. Rebuilt per render
-   * rather than handed out live: the rows are snapshots, so the sidebar can
-   * tell a changed colour from an unchanged one.
-   */
-  private sidebarViewModel(): SidebarViewModel {
-    return {
-      fileLabel: this.scene?.label ?? '—',
-      targets: this.registry.list().map((target) => ({
-        key: target.key,
-        displayName: target.displayName,
-        originalHex: target.originalHex,
-        currentHex: target.currentHex,
-      })),
-      materials: this.registry.allMaterials(),
-      library: this.store.library,
-      schemes: this.store.schemes,
-      activeId: this.store.activeSchemeId,
-      selectedKey: this.selectedKey,
-      hoveredKey: this.hoveredKey,
-    };
-  }
-
-  /**
    * Push current state into both views. Every mutation ends with this one
    * call rather than a per-call-site list of which panels to refresh — both
    * views diff against what they already drew, so it stays cheap enough for
    * a picker drag and a 3D hover.
+   *
+   * The scheme slots are built once and handed to both, so the two panels
+   * can't disagree about which scheme is live.
    */
   private render(): void {
-    const schemes: SchemeView = {
-      schemes: this.store.schemes,
-      activeId: this.store.activeSchemeId,
-    };
-    this.toolbar.renderSchemes(schemes);
-    this.sidebar.render(this.sidebarViewModel());
+    const vm = sidebarViewModel({
+      scene: this.scene,
+      registry: this.registry,
+      store: this.store,
+      selectedKey: this.selectedKey,
+      hoveredKey: this.hoveredKey,
+    });
+    this.toolbar.renderSchemes(vm.schemes);
+    this.sidebar.render(vm);
   }
 
   private refreshAll(): void {

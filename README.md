@@ -433,6 +433,8 @@ objects it hands out in place.
 ```
 src/
   main.ts                  App — wiring, shortcuts, persistence, screenshots
+  sidebarViewModel.ts      Gathers what the sidebar should be showing into one
+                           plain object; no DOM, so it is directly assertable
   types.ts                 Shared types; PAINT_ prefix and START_CAM name live here
   core/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
@@ -460,7 +462,8 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            23 tests over the fallback scene
-  sidebar.test.ts          16 tests over the sidebar's view model and diffing
+  viewModel.test.ts        6 tests over the sidebar view model — no DOM
+  sidebar.test.ts          16 tests over the sidebar's rendering and diffing
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -475,11 +478,17 @@ It builds the procedural room, runs discovery against it, and checks the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
 
-`sidebar.test.ts` runs against happy-dom instead (a `@vitest-environment`
-docblock, so the rest of the suite stays in plain node). The sidebar takes its
-whole state as one plain object, so the panel's behaviour — which sections a
-render rebuilds, which it leaves standing, and what survives an open colour
-picker — is assertable without a browser.
+The sidebar splits the same way, which is why it takes a view model at all.
+`sidebarViewModel.ts` answers "what should the panel be showing?" as a plain
+object, and `viewModel.test.ts` asserts that in plain node — including that
+nothing from three.js leaks in, and that paint rows are _snapshots_ rather than
+the registry's live targets (which it mutates in place, so handing them over
+would leave the panel diffing a value against itself).
+
+Only the drawing half needs a document. `sidebar.test.ts` runs against happy-dom
+via a `@vitest-environment` docblock, so the rest of the suite stays in plain
+node, and covers which sections a render rebuilds, which it leaves standing, and
+what survives an open colour picker.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

@@ -38,8 +38,7 @@ function viewModel(overrides: Partial<SidebarViewModel> = {}): SidebarViewModel 
     targets: [],
     materials: [],
     library: [],
-    schemes: [],
-    activeId: null,
+    schemes: { schemes: [], activeId: null },
     selectedKey: null,
     hoveredKey: null,
     ...overrides,
@@ -204,20 +203,20 @@ describe('Sidebar colour picker', () => {
 
 describe('Sidebar schemes and library', () => {
   it('marks the active scheme, and lets go of it when the app clears it', () => {
-    const ui = mount(viewModel({ schemes: schemes(), activeId: 'slot-1' }));
+    const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
     expect(ui.schemeRows()[0].classList.contains('selected')).toBe(true);
 
     // Painting a wall clears the active scheme; the row must follow.
-    ui.sidebar.render(viewModel({ schemes: schemes(), activeId: null }));
+    ui.sidebar.render(viewModel({ schemes: { schemes: schemes(), activeId: null } }));
 
     expect(ui.schemeRows().some((r) => r.classList.contains('selected'))).toBe(false);
   });
 
   it('leaves an unchanged scheme list alone', () => {
-    const ui = mount(viewModel({ schemes: schemes(), activeId: 'slot-1' }));
+    const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
     const before = ui.schemeRows()[0];
 
-    ui.sidebar.render(viewModel({ schemes: schemes(), activeId: 'slot-1' }));
+    ui.sidebar.render(viewModel({ schemes: { schemes: schemes(), activeId: 'slot-1' } }));
 
     expect(ui.schemeRows()[0]).toBe(before);
   });
@@ -225,10 +224,10 @@ describe('Sidebar schemes and library', () => {
   it('takes a rename without rebuilding the row it came from', () => {
     const renamed = schemes();
     renamed[0].name = 'Warm white';
-    const ui = mount(viewModel({ schemes: schemes(), activeId: null }));
+    const ui = mount(viewModel({ schemes: { schemes: schemes(), activeId: null } }));
     const before = ui.schemeNames()[0];
 
-    ui.sidebar.render(viewModel({ schemes: renamed, activeId: null }));
+    ui.sidebar.render(viewModel({ schemes: { schemes: renamed, activeId: null } }));
 
     expect(ui.schemeNames()[0]).toBe(before);
     expect(before.value).toBe('Warm white');
