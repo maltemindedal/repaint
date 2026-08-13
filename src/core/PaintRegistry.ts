@@ -44,12 +44,28 @@ export class PaintRegistry {
   private groups = new Map<string, MaterialGroup>();
   /** material instance -> target key, for O(1) raycast hit resolution. */
   private byMaterial = new Map<MeshStandardMaterial, string>();
+  /**
+   * material name -> the sRGB hex the GLB shipped with, captured the first time
+   * we see a scene graph — while the materials are still pristine.
+   *
+   * A re-discovery of the *same* graph (a manual tag toggle, a settings import)
+   * runs against materials that already carry the user's paint, so the live
+   * colour is no longer a usable source for `originalHex`. Dropped when the
+   * root changes, since a new load brings its own materials.
+   */
+  private exportedHex = new Map<string, string>();
+  private root: Object3D | null = null;
   private scratch = new Color();
 
   /** Rebuilds from a scene graph. Safe to call again after re-tagging. */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
     const untagged = new Set(options.untagged ?? []);
+
+    if (root !== this.root) {
+      this.root = root;
+      this.exportedHex.clear();
+    }
 
     this.groups.clear();
     root.traverse((obj) => {
@@ -68,6 +84,14 @@ export class PaintRegistry {
       }
     });
 
+    // Record every group, paintable or not: an untagged material keeps whatever
+    // paint it was wearing, so its exported colour has to be banked before it
+    // can be tagged again.
+    for (const group of this.groups.values()) {
+      if (this.exportedHex.has(group.name)) continue;
+      this.exportedHex.set(group.name, `#${group.materials[0].color.getHexString(SRGBColorSpace)}`);
+    }
+
     // Preserve any colour already applied to a surviving target across a
     // re-discovery (e.g. after toggling a manual tag).
     const previous = new Map([...this.targets].map(([k, t]) => [k, t.currentHex]));
@@ -80,7 +104,7 @@ export class PaintRegistry {
       const paintable = (auto && !untagged.has(group.name)) || tagged.has(group.name);
       if (!paintable) continue;
 
-      const originalHex = `#${group.materials[0].color.getHexString(SRGBColorSpace)}`;
+      const originalHex = this.exportedHex.get(group.name)!;
       const target: PaintTarget = {
         key: group.name,
         displayName: displayNameFor(group.name),

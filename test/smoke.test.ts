@@ -179,6 +179,40 @@ describe('colour pipeline', () => {
       registry.get('PAINT_Living_North')!.materials[0].color.getHexString(SRGBColorSpace),
     ).toBe('abcdef');
   });
+
+  it('still knows the exported colour after a re-discovery of a painted scene', () => {
+    const { root, registry } = buildScene();
+    const exported = registry.get('PAINT_Living_North')!.originalHex;
+    expect(exported).not.toBe('#abcdef');
+
+    registry.setColor('PAINT_Living_North', '#abcdef');
+    // What a manual tag toggle does: re-run discovery over the same materials,
+    // which by now carry paint rather than the colours the GLB shipped with.
+    registry.discover(root, { tagged: ['Floor_Oak'] });
+
+    const target = registry.get('PAINT_Living_North')!;
+    expect(target.originalHex).toBe(exported);
+
+    registry.resetColor(target.key);
+    expect(target.currentHex).toBe(exported);
+    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(exported.slice(1));
+  });
+
+  it('re-reads exported colours when a different scene is loaded', () => {
+    const { registry } = buildScene();
+    registry.setColor('PAINT_Living_North', '#abcdef');
+
+    // A fresh load brings its own materials — the previous scene's exported
+    // colours must not leak into it.
+    const other = createFallbackScene();
+    const wall = other.children.find(
+      (c) => ((c as Mesh).material as MeshStandardMaterial)?.name === 'PAINT_Living_North',
+    ) as Mesh;
+    (wall.material as MeshStandardMaterial).color.setStyle('#102030', SRGBColorSpace);
+    registry.discover(other);
+
+    expect(registry.get('PAINT_Living_North')!.originalHex).toBe('#102030');
+  });
 });
 
 describe('colour utilities', () => {
