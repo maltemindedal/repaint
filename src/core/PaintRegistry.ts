@@ -25,6 +25,11 @@ export function isAutoPaintName(materialName: string): boolean {
   return materialName.toUpperCase().startsWith(PAINT_PREFIX);
 }
 
+/** A three `Color` -> the sRGB `#rrggbb` the rest of the app speaks. */
+function hexOf(color: Color): string {
+  return `#${color.getHexString(SRGBColorSpace)}`;
+}
+
 export interface DiscoverOptions {
   /** Material names manually marked paintable (no `PAINT_` prefix). */
   tagged?: string[];
@@ -44,6 +49,18 @@ export class PaintRegistry {
   private groups = new Map<string, MaterialGroup>();
   /** material instance -> target key, for O(1) raycast hit resolution. */
   private byMaterial = new Map<MeshStandardMaterial, string>();
+  /**
+   * material name -> the sRGB hex the GLB shipped with, captured the first time
+   * we see a scene graph — while the materials are still pristine.
+   *
+   * A re-discovery of the *same* graph (a manual tag toggle, a settings import)
+   * runs against materials that already carry the user's paint, so the live
+   * colour is no longer a usable source. Dropped when the root changes, since a
+   * new load brings its own materials.
+   */
+  private originalHexes = new Map<string, string>();
+  /** The graph we last discovered. A different one means a fresh load. */
+  private root: Object3D | null = null;
   private scratch = new Color();
 
   // Both sorted views cost an Intl collation per comparison, and both change
@@ -55,13 +72,22 @@ export class PaintRegistry {
   /**
    * Rebuilds from a scene graph. Safe to call again after re-tagging.
    *
-   * Reads colour, never writes it: a target comes back on whatever the graph
-   * currently says, both `originalHex` and `currentHex`. Putting back what was
-   * on screen belongs to `SceneSession.discoverTargets`.
+   * Reads colour, never writes it: `currentHex` comes back on whatever the
+   * graph currently says. Putting back what was on screen belongs to
+   * `SceneSession.discoverTargets`.
+   *
+   * `originalHex` is the one thing the graph can no longer answer for on a
+   * re-discovery — by then the materials wear the user's paint — so it comes
+   * from `this.originalHexes`, banked on the way past below.
    */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
     const untagged = new Set(options.untagged ?? []);
+
+    if (root !== this.root) {
+      this.root = root;
+      this.originalHexes.clear();
+    }
 
     this.sortedTargets = null;
     this.sortedMaterials = null;
@@ -75,6 +101,11 @@ export class PaintRegistry {
         if (!group) {
           group = { name: mat.name, materials: [], meshes: [], hasColorMap: false };
           this.groups.set(mat.name, group);
+          // Bank the shipped colour here, where the material is first seen and
+          // still pristine — and for every material, paintable or not: an
+          // untagged one keeps whatever paint it was wearing, so its exported
+          // colour has to be on record before it can be tagged again.
+          if (!this.originalHexes.has(mat.name)) this.originalHexes.set(mat.name, hexOf(mat.color));
         }
         if (!group.materials.includes(mat)) group.materials.push(mat);
         if (!group.meshes.includes(mesh)) group.meshes.push(mesh);
@@ -90,14 +121,14 @@ export class PaintRegistry {
       const paintable = (auto && !untagged.has(group.name)) || tagged.has(group.name);
       if (!paintable) continue;
 
-      const originalHex = `#${group.materials[0].color.getHexString(SRGBColorSpace)}`;
+      const live = hexOf(group.materials[0].color);
       const target: PaintTarget = {
         key: group.name,
         displayName: displayNameFor(group.name),
         materials: group.materials,
         meshes: group.meshes,
-        originalHex,
-        currentHex: originalHex,
+        originalHex: this.originalHexes.get(group.name) ?? live,
+        currentHex: live,
         auto,
       };
       this.targets.set(group.name, target);
@@ -166,7 +197,7 @@ export class PaintRegistry {
     if (!target) return false;
     this.scratch.setStyle(hex, SRGBColorSpace);
     for (const mat of target.materials) mat.color.copy(this.scratch);
-    target.currentHex = `#${this.scratch.getHexString(SRGBColorSpace)}`;
+    target.currentHex = hexOf(this.scratch);
     return true;
   }
 

@@ -468,9 +468,9 @@ src/
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
-  smoke.test.ts            24 tests over the fallback scene
+  smoke.test.ts            26 tests over the fallback scene
   navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
-  sceneSession.test.ts     16 tests pinning the scene-activation order
+  sceneSession.test.ts     17 tests pinning the scene-activation order
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
   walk-motion.test.ts        12 tests pinning eye-height ownership
   viewModel.test.ts        6 tests over the sidebar view model — no DOM

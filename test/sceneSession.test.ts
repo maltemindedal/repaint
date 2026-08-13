@@ -286,6 +286,24 @@ describe('colour restore', () => {
     expect(targetLists.at(-1)).toContain('Floor_Oak');
   });
 
+  it('keeps the exported colour across a re-tag', () => {
+    const { registry, session, store } = makeHarness();
+    const scene = makeScene();
+    session.load(scene);
+    const exported = registry.get('PAINT_Living_North')!.originalHex;
+
+    registry.setColor('PAINT_Living_North', '#abcdef');
+    store.setCurrentColor('PAINT_Living_North', '#abcdef');
+    store.setTagged('Floor_Oak', true, false);
+    session.rediscover();
+
+    // Guards the reported bug: re-discovery reading the exported colour off
+    // materials that by now wear the user's paint, so R "resets" to the paint.
+    expect(registry.get('PAINT_Living_North')!.originalHex).toBe(exported);
+    registry.resetColor('PAINT_Living_North');
+    expect(registry.get('PAINT_Living_North')!.currentHex).toBe(exported);
+  });
+
   it('ignores stored colours for materials this scene does not have', () => {
     const { registry, session, store } = makeHarness();
     const scene = makeScene();
