@@ -304,7 +304,8 @@ this tool genuinely beats a paint chart; absolute colour accuracy is not.
   Can't drop below the floor. **Double-click any surface** to ease the pivot onto
   that point, which is how you get the camera to behave in a tight room.
 - **Walk** — `WASD`, `Shift` to move faster, `Q`/`E` or scroll for eye height,
-  drag to look. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
+  drag to look. Eye height is saved as you change it, so nothing stands you back
+  up. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
   While locked, clicking picks the wall under the centre of the screen. There's no
   collision (by design) — you're clamped to the scene's bounding box so you can't
   get lost.
@@ -448,8 +449,10 @@ src/
     fallbackScene.ts       Procedural demo room (also the smoke-test fixture)
   nav/
     NavigationController.ts  Mode switching, pose save/restore, double-click focus
-    WalkControls.ts          Damped first-person controls; settle-detection for
-                             persisting the walk pose after you stop moving
+    WalkControls.ts          Pointer/wheel/key listeners for first-person mode
+    WalkMotion.ts            DOM-free camera state machine: damped movement over
+                             keys/bounds, settle-detection for persisting the
+                             walk pose, and the one funnel for eye height
   state/
     store.ts               All persisted state, debounced writes
     storage.ts             localStorage + memory fallback; validating migration
@@ -464,6 +467,7 @@ scripts/
 test/
   smoke.test.ts            23 tests over the fallback scene
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
+  walk-motion.test.ts        12 tests pinning eye-height ownership
   viewModel.test.ts        6 tests over the sidebar view model — no DOM
   sidebar.test.ts          16 tests over the sidebar's rendering and diffing
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
