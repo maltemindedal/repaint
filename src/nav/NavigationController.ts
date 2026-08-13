@@ -1,4 +1,4 @@
-import { Box3, MathUtils, Vector3 } from 'three';
+import { Box3, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
 import type { CameraPose, NavMode } from '../types.ts';
@@ -172,18 +172,5 @@ export class NavigationController {
     } else {
       this.walk.update(dt);
     }
-  }
-
-  setEyeHeight(value: number): void {
-    this.walk.setEyeHeight(value);
-  }
-
-  setWalkSpeed(value: number): void {
-    this.walk.speed = MathUtils.clamp(value, 0.2, 20);
-  }
-
-  dispose(): void {
-    this.orbit.dispose();
-    this.walk.dispose();
   }
 }
