@@ -157,6 +157,11 @@ export class WalkControls {
     this.onChange?.();
   }
 
+  /** Clamped because a hand-edited or imported settings file can carry anything. */
+  setSpeed(value: number): void {
+    this.speed = MathUtils.clamp(value, 0.2, 20);
+  }
+
   // ---------------------------------------------------------------- keys
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -277,17 +282,6 @@ export class WalkControls {
     this.camera.position.copy(this.position);
     this.euler.set(this.pitch, this.yaw, 0, 'YXZ');
     this.camera.quaternion.setFromEuler(this.euler);
-  }
-
-  dispose(): void {
-    this.domElement.removeEventListener('pointerdown', this.onPointerDown);
-    this.domElement.removeEventListener('wheel', this.onWheel);
-    window.removeEventListener('pointermove', this.onPointerMove);
-    window.removeEventListener('pointerup', this.onPointerUp);
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
-    window.removeEventListener('blur', this.onBlur);
-    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
   }
 }
 

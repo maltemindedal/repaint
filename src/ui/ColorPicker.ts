@@ -185,11 +185,6 @@ export class ColorPicker {
     if (!keepInput) this.hexInput.value = hex.toUpperCase();
     if (notify) this.options.onChange(hex);
   }
-
-  focusHex(): void {
-    this.hexInput.focus();
-    this.hexInput.select();
-  }
 }
 
 /** Normalised (0..1) pointer drag over an element. */
