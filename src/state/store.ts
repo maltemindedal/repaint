@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: SceneSettings = {
   // 0 by default: the same baked texture drives lightMap, so also feeding it
   // into aoMap would multiply the occlusion in twice. Scenes whose occlusion is
   // ORM-packed (AO-only, no lightmap) get a per-scene default of 1 instead —
-  // see App.setScene. See README.
+  // see SceneSession.applyHeuristicDefaults. See README.
   aoMapIntensity: 0.0,
   envIntensity: 0.25,
   punctualLights: false,
@@ -222,6 +222,17 @@ export class AppStore {
   setSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
     this.scene.settings[key] = value;
     this.queueSave();
+  }
+
+  /**
+   * Records a guess: writes only when this scene has no choice of its own.
+   *
+   * `settings` merges the global defaults in, so it can't answer "has the user
+   * decided this?" — only the raw per-scene block can, and that stays in here.
+   */
+  setDefaultSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
+    if (this.scene.settings[key] !== undefined) return;
+    this.setSetting(key, value);
   }
 
   // ------------------------------------------------------- import/export
