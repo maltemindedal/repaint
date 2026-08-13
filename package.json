@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Repaint — interactive 3D viewer for a Blender apartment scene with live wall-paint recoloring.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

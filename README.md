@@ -118,6 +118,9 @@ suite. See [docs/contributing.md](docs/contributing.md).
 
 ## License
 
-> **TODO(verify):** No licence file exists in this repository, and `package.json`
-> is marked `"private": true` with no `license` field. Add a `LICENSE` and link it
-> here, or state that the project is unlicensed and all rights are reserved.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Malte Mindedal.
+
+`package.json` stays `"private": true` so the package is never published to npm
+by accident; that flag says nothing about the licence, which is MIT for the source
+and the docs alike. The runtime dependencies — three.js, lil-gui and stats.js —
+are MIT too, so a `dist/` or `dist/repaint.html` build carries only MIT code.

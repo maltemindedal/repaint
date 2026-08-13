@@ -111,6 +111,13 @@ suggests squash merges.
 > naming are inferred from commit history rather than documented. A maintainer
 > should confirm or replace this section.
 
+## License
+
+The project is MIT — the full text is in [LICENSE](../LICENSE) at the repository
+root. By opening a pull request you agree that your contribution ships under that
+licence; there is no CLA. Keep it that way when adding a dependency: everything in
+`dependencies` is MIT today, so a build carries only MIT code.
+
 ## Documentation
 
 Docs live in `docs/` and follow the [Diátaxis](https://diataxis.fr) split —

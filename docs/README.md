@@ -44,9 +44,10 @@ on screen.
 
 ## Contributing
 
-| Document                        | What it covers                                                                                                  | For                                   |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| [Contributing](contributing.md) | Dev setup, the pre-push check, test conventions, code style, PR conventions, and how to keep these docs in sync | Anyone opening a PR against this repo |
+| Document                        | What it covers                                                                                                  | For                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| [Contributing](contributing.md) | Dev setup, the pre-push check, test conventions, code style, PR conventions, and how to keep these docs in sync | Anyone opening a PR against this repo  |
+| [License](../LICENSE)           | The MIT licence this project, its docs and its builds are released under                                        | Anyone reusing, forking or shipping it |
 
 ## Conventions used here
 
