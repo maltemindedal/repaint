@@ -1,6 +1,7 @@
 import { Box3, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
+import { WalkMotion } from './WalkMotion.ts';
 import type { CameraPose, NavMode } from '../types.ts';
 import type { Viewer } from '../core/Viewer.ts';
 
@@ -12,7 +13,10 @@ import type { Viewer } from '../core/Viewer.ts';
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
-  readonly walk: WalkControls;
+  /** Walk-mode camera state: ask this what walk mode is doing, and tell it to move. */
+  readonly walk: WalkMotion;
+  /** The listeners that drive `walk`. Public only for pointer lock. */
+  readonly walkInput: WalkControls;
 
   private _mode: NavMode = 'orbit';
   private bounds: Box3 | null = null;
@@ -37,11 +41,12 @@ export class NavigationController {
     // Never orbit under the horizon of the target — keeps you out of the floor.
     this.orbit.maxPolarAngle = Math.PI / 2;
 
-    this.walk = new WalkControls(viewer.camera, viewer.canvas);
-    this.walk.enabled = false;
+    this.walk = new WalkMotion(viewer.camera);
+    this.walkInput = new WalkControls(this.walk, viewer.canvas);
+    this.walkInput.enabled = false;
 
     this.orbit.addEventListener('end', () => this.emitPose());
-    this.walk.onChange = () => this.emitPose();
+    this.walk.onPoseSettled = () => this.emitPose();
   }
 
   // ---------------------------------------------------------------- mode
@@ -56,15 +61,14 @@ export class NavigationController {
 
     if (mode === 'walk') {
       this.orbit.enabled = false;
-      this.walk.enabled = true;
+      this.walkInput.enabled = true;
+      // Stands at eye height where the camera already is — walk mode owns that
+      // arithmetic, so it isn't repeated out here.
       this.walk.syncFromCamera();
-      // Stand at eye height where the camera already is.
-      const eye = this.walk.eye;
-      eye.y = this.floorY + this.walk.eyeHeight;
       this.viewer.canvas.classList.add('walk-mode');
     } else {
-      this.walk.enabled = false;
-      this.walk.exitPointerLock();
+      this.walkInput.enabled = false;
+      this.walkInput.exitPointerLock();
       this.orbit.enabled = true;
       // Put the orbit pivot a few metres ahead of where you were looking.
       const forward = new Vector3(0, 0, -1).applyQuaternion(this.viewer.camera.quaternion);
