@@ -35,6 +35,7 @@ with `FileReader` and stays in the tab.
   - [2. Baking lighting to a second UV set](#2-baking-lighting-to-a-second-uv-set)
   - [3. glTF export settings](#3-gltf-export-settings)
   - [4. Sanity-check before you drop it in](#4-sanity-check-before-you-drop-it-in)
+  - [5. Or: automate steps 2–3 with a script](#5-or-automate-steps-23-with-a-script)
 - [The tone-mapping colour caveat](#the-tone-mapping-colour-caveat)
 - [Using the app](#using-the-app)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -255,6 +256,46 @@ In this app, press `` ` `` for the debug panel (mesh/triangle/texture counts,
 compression, whether a bake was detected) and check the console — every load logs a
 collapsed report. **Scene → Log material report** prints a table of every material
 with whether it's paintable and whether it carries a colour texture.
+
+### 5. Or: automate steps 2–3 with a script
+
+[`scripts/bake_export.py`](scripts/bake_export.py) runs the whole bake-and-export
+pipeline headless, no clicking:
+
+```bash
+blender --background apartment.blend --python scripts/bake_export.py -- \
+    --out apartment.glb --gpu
+```
+
+It applies modifiers, makes linked duplicates single-user, adds the `Lightmap` UV
+layer, atlas-unwraps groups of objects **together** into a shared UV space (one
+atlas per top-level collection by default — groups that share a material are
+merged, because the bake image lives on the material), wires the bake nodes and
+the `glTF Material Output` group into every material, bakes Diffuse
+Direct+Indirect with Cycles, and exports the `.glb` with the settings from the
+table above. The source `.blend` is never saved; raw bake PNGs land in `bakes/`
+next to the output for inspection.
+
+Options after the `--`:
+
+| Flag              | Default      | Meaning                                                       |
+| ----------------- | ------------ | ------------------------------------------------------------- |
+| `--out PATH`      | `<blend>.glb`| Output file.                                                  |
+| `--atlas-size N`  | `2048`       | Bake image size per atlas group.                              |
+| `--samples N`     | `128`        | Cycles samples. Bump if the bake is noisy.                    |
+| `--margin N`      | `16`         | Bake margin in pixels.                                        |
+| `--island-margin F`| `0.03`      | Smart UV Project island spacing.                              |
+| `--min-size F`    | `0` (off)    | Skip baking objects smaller than F metres — still exported, just lit by the environment. |
+| `--group-by MODE` | `collection` | `collection` or `single` (one atlas for everything).          |
+| `--gpu`           | off          | Bake on Metal/CUDA/OptiX/HIP if available.                    |
+| `--draco`         | off          | Draco-compress the export.                                    |
+| `--no-lights`     | off          | Leave punctual lights out of the `.glb`.                      |
+
+What it can't do for you: name your `PAINT_` materials (that's a design decision —
+though the in-app manual tagging fallback still works), light the scene (a bake
+with no lights is black, and the script warns about it), or judge bake quality —
+check the result in the app and re-run with more samples or a bigger atlas where
+it looks rough.
 
 ---
 
