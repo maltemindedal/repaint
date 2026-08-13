@@ -2,6 +2,7 @@ import './style.css';
 import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
+import { PaintController, type PaintChange } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
 import { defaultPose } from './core/processScene.ts';
 import { NavigationController } from './nav/NavigationController.ts';
@@ -29,6 +30,7 @@ class App {
   private picker: Picker;
   private nav: NavigationController;
   private store = new AppStore();
+  private paint = new PaintController(this.registry, this.store);
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
@@ -52,7 +54,7 @@ class App {
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
-      onColorChange: (key, hex) => this.setColor(key, hex),
+      onColorChange: (key, hex) => this.paint.apply(key, hex),
       onResetTarget: (key) => this.resetTarget(key),
       onResetAll: () => this.resetAll(),
       onTagChange: (name, tagged) => this.setTag(name, tagged),
@@ -89,6 +91,8 @@ class App {
     this.debug.mount(requireElement('viewport'));
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
+
+    this.paint.onPaintChanged = (change) => this.renderPaintChange(change);
 
     this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
@@ -225,7 +229,9 @@ class App {
     const prefs = this.store.scene;
     this.registry.discover(this.scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
 
-    // Restore whatever colours were on screen last time.
+    // Restore whatever colours were on screen last time. Straight to the
+    // registry, not through PaintController: this reads *from* the store, so
+    // writing back would only re-save it and drop the active scheme.
     for (const [key, hex] of Object.entries(this.store.currentColors)) {
       this.registry.setColor(key, hex);
     }
@@ -238,37 +244,32 @@ class App {
 
   // -------------------------------------------------------------- colour
 
-  private setColor(key: string, hex: string): void {
-    if (!this.registry.setColor(key, hex)) return;
-    this.store.setCurrentColor(key, hex);
-    this.store.setActiveScheme(null);
-    this.toolbar.renderSchemes({ schemes: this.store.schemes, activeId: null });
+  /**
+   * The single place a paint change reaches the views. Every repaint — picker
+   * drag, library click, scheme, reset — arrives here, so no call site can
+   * update half the UI and leave the other half stale.
+   */
+  private renderPaintChange(change: PaintChange): void {
+    for (const [key, hex] of change.colors) this.sidebar.updateTarget(key, hex);
+
+    const selectedHex = this.selectedKey ? change.colors.get(this.selectedKey) : undefined;
+    if (selectedHex) this.sidebar.syncPicker(selectedHex);
+
+    // Only when the slots or the active one actually moved — a picker drag
+    // fires this dozens of times a second and must not rebuild them.
+    if (change.schemes) this.renderSchemes(change.schemes);
   }
 
   private resetTarget(key: string): void {
-    const target = this.registry.get(key);
+    const target = this.paint.reset(key);
     if (!target) return;
-    this.registry.resetColor(key);
-    this.store.clearCurrentColor(key);
-    this.sidebar.updateTarget(key, target.currentHex);
-    if (this.selectedKey === key) this.sidebar.syncPicker(target.currentHex);
     this.panel.status(
       `${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`,
     );
   }
 
   private resetAll(): void {
-    this.registry.resetAll();
-    for (const target of this.registry.list()) {
-      this.store.clearCurrentColor(target.key);
-      this.sidebar.updateTarget(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(null);
-    this.renderSchemes();
+    this.paint.resetAll();
     this.panel.status('All walls back to their exported colours');
   }
 
@@ -296,49 +297,38 @@ class App {
       this.panel.status('Select a wall first, then click a library colour.', 3500);
       return;
     }
-    this.setColor(this.selectedKey, entry.hex);
-    this.sidebar.updateTarget(this.selectedKey, entry.hex);
-    this.sidebar.syncPicker(entry.hex);
+    if (!this.paint.apply(this.selectedKey, entry.hex)) return;
     this.panel.status(`${entry.name} applied`);
   }
 
   // ------------------------------------------------------------- schemes
 
   private applyScheme(id: string): void {
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    if (!scheme) return;
-    const count = Object.keys(scheme.colors).length;
-    if (count === 0) {
-      this.panel.status(`“${scheme.name}” is empty — use “Save current” to fill it.`, 4000);
+    const result = this.paint.applyScheme(id);
+    if (result.outcome === 'missing') return;
+    if (result.outcome === 'empty') {
+      this.panel.status(`“${result.scheme.name}” is empty — use “Save current” to fill it.`, 4000);
       return;
     }
-
-    const applied = this.registry.applyScheme(scheme.colors);
-    for (const target of this.registry.list()) {
-      this.sidebar.updateTarget(target.key, target.currentHex);
-      this.store.setCurrentColor(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    this.panel.status(`${scheme.name} — ${applied}/${count} colours applied`);
+    this.panel.status(
+      `${result.scheme.name} — ${result.applied}/${result.requested} colours applied`,
+    );
   }
 
   private captureScheme(id: string): void {
-    this.store.saveScheme(id, this.registry.capture());
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    this.panel.status(`Saved current colours into “${scheme?.name ?? id}”`);
+    const scheme = this.paint.capture(id);
+    if (!scheme) return;
+    this.panel.status(`Saved current colours into “${scheme.name}”`);
   }
 
-  private renderSchemes(): void {
-    const view: SchemeView = { schemes: this.store.schemes, activeId: this.store.activeSchemeId };
-    this.toolbar.renderSchemes(view);
-    this.sidebar.renderSchemes(view);
+  /** Both scheme views, always together. Defaults to whatever the store holds. */
+  private renderSchemes(view?: SchemeView): void {
+    const next: SchemeView = view ?? {
+      schemes: this.store.schemes,
+      activeId: this.store.activeSchemeId,
+    };
+    this.toolbar.renderSchemes(next);
+    this.sidebar.renderSchemes(next);
   }
 
   private renderLibrary(): void {
