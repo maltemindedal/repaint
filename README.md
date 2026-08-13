@@ -285,7 +285,7 @@ Options after the `--`:
 | `--samples N`     | `128`        | Cycles samples. Bump if the bake is noisy.                    |
 | `--margin N`      | `16`         | Bake margin in pixels.                                        |
 | `--island-margin F`| `0.03`      | Smart UV Project island spacing.                              |
-| `--min-size F`    | `0` (off)    | Skip baking objects smaller than F metres — still exported, just lit by the environment. |
+| `--min-size F`    | `0` (off)    | Skip baking objects smaller than F metres — still exported, just lit by the environment. Objects sharing a material with a baked object are promoted into the bake instead (the bake image lives on the material). |
 | `--group-by MODE` | `collection` | `collection` or `single` (one atlas for everything).          |
 | `--gpu`           | off          | Bake on Metal/CUDA/OptiX/HIP if available.                    |
 | `--draco`         | off          | Draco-compress the export.                                    |
