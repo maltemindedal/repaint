@@ -304,7 +304,8 @@ this tool genuinely beats a paint chart; absolute colour accuracy is not.
   Can't drop below the floor. **Double-click any surface** to ease the pivot onto
   that point, which is how you get the camera to behave in a tight room.
 - **Walk** — `WASD`, `Shift` to move faster, `Q`/`E` or scroll for eye height,
-  drag to look. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
+  drag to look. Eye height is saved as you change it, so nothing stands you back
+  up. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
   While locked, clicking picks the wall under the centre of the screen. There's no
   collision (by design) — you're clamped to the scene's bounding box so you can't
   get lost.
@@ -435,8 +436,10 @@ src/
   nav/
     NavigationController.ts  Mode switching, pose save/restore, pointer lock,
                              double-click focus
-    WalkControls.ts          Damped first-person controls; settle-detection for
-                             persisting the walk pose after you stop moving
+    WalkControls.ts          Pointer/wheel/key listeners for first-person mode
+    WalkMotion.ts            DOM-free camera state machine: damped movement over
+                             keys/bounds, settle-detection for persisting the
+                             walk pose, and the one funnel for eye height
   state/
     store.ts               All persisted state, debounced writes
     storage.ts             localStorage + memory fallback; validating migration
@@ -450,6 +453,7 @@ test/
   smoke.test.ts            22 tests over the fallback scene
   navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
+  walk-motion.test.ts        12 tests pinning eye-height ownership
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -480,12 +484,13 @@ that the scheme rows are asked to re-render exactly when the slots change and
 not once more. Whether `main.ts` then draws both views is browser-side and not
 covered here — the sidebar/toolbar seam is the next thing worth deepening.
 
-`navigation.test.ts` covers the one part of `nav/` that is reachable without a
-renderer: `NavigationController` reads only `viewer.camera` and `viewer.canvas`,
-so the orbit ⇄ walk hand-off can be stepped frame by frame in node. It does need
-listeners, so that file — and only that file — stands up a stub `window`,
-`document` and canvas on `globalThis` for the duration of each test. Deliberate:
-a jsdom dependency to satisfy a handful of `addEventListener` calls costs more
+`nav/` is testable in node for the same reason: `WalkMotion` is camera state and
+nothing else, and `NavigationController` takes a `NavHost` — just a camera and
+an element — rather than the whole `Viewer`. So `walk-motion.test.ts` needs no
+DOM at all, and `navigation.test.ts` needs only a stub one: a fake element and
+`window`/`document` on `globalThis`, installed once for the file, enough for
+`OrbitControls` to bind and for WASD to be dispatched at a walk. Deliberate: a
+jsdom dependency to satisfy a handful of `addEventListener` calls costs more
 than the stub does. Anything needing real layout or a GL context belongs in
 manual testing against a fixture instead.
 
