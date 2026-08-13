@@ -1,6 +1,7 @@
 import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
+import { WalkMotion } from './WalkMotion.ts';
 import type { CameraPose, NavMode } from '../types.ts';
 
 /**
@@ -23,7 +24,10 @@ export interface NavHost {
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
-  private readonly walk: WalkControls;
+  /** Walk-mode camera state: ask this what walk mode is doing, and tell it to move. */
+  readonly walk: WalkMotion;
+  /** The listeners that drive `walk`. Private — pointer lock is forwarded below. */
+  private readonly walkInput: WalkControls;
 
   private _mode: NavMode = 'orbit';
   private bounds: Box3 | null = null;
@@ -48,11 +52,12 @@ export class NavigationController {
     // Never orbit under the horizon of the target — keeps you out of the floor.
     this.orbit.maxPolarAngle = Math.PI / 2;
 
-    this.walk = new WalkControls(host.camera, host.canvas);
-    this.walk.enabled = false;
+    this.walk = new WalkMotion(host.camera);
+    this.walkInput = new WalkControls(this.walk, host.canvas);
+    this.walkInput.enabled = false;
 
     this.orbit.addEventListener('end', () => this.emitPose());
-    this.walk.onChange = () => this.emitPose();
+    this.walk.onPoseSettled = () => this.emitPose();
   }
 
   // ---------------------------------------------------------------- mode
@@ -75,14 +80,14 @@ export class NavigationController {
 
     if (mode === 'walk') {
       this.orbit.enabled = false;
-      this.walk.enabled = true;
+      this.walkInput.enabled = true;
+      // Stands at eye height where the camera already is — walk mode owns that
+      // arithmetic, so it isn't repeated out here.
       this.walk.syncFromCamera();
-      // Stand at eye height where the camera already is.
-      this.walk.standAt(this.floorY);
       this.host.canvas.classList.add('walk-mode');
     } else {
-      this.walk.enabled = false;
-      this.walk.exitPointerLock();
+      this.walkInput.enabled = false;
+      this.walkInput.exitPointerLock();
       this.orbit.enabled = true;
       // Put the orbit pivot a few metres ahead of where you were looking.
       const forward = new Vector3(0, 0, -1).applyQuaternion(this.host.camera.quaternion);
@@ -101,15 +106,15 @@ export class NavigationController {
 
   /** No-op outside walk mode — orbit has no use for a captured pointer. */
   requestPointerLock(): void {
-    this.walk.requestPointerLock();
+    this.walkInput.requestPointerLock();
   }
 
   exitPointerLock(): void {
-    this.walk.exitPointerLock();
+    this.walkInput.exitPointerLock();
   }
 
   get isPointerLocked(): boolean {
-    return this.walk.isPointerLocked;
+    return this.walkInput.isPointerLocked;
   }
 
   // -------------------------------------------------------------- bounds
@@ -206,20 +211,5 @@ export class NavigationController {
     } else {
       this.walk.update(dt);
     }
-  }
-
-  // ------------------------------------------------------------ settings
-
-  // #6 deleted these as pure pass-throughs, on the grounds that callers could
-  // reach `walk` directly. They can't any more — the seam closed — so removing
-  // them now would push complexity back onto `App`, which is the test #6 set.
-  // The clamps stay where #6 put them, in WalkControls.
-
-  setEyeHeight(value: number): void {
-    this.walk.setEyeHeight(value);
-  }
-
-  setWalkSpeed(value: number): void {
-    this.walk.setSpeed(value);
   }
 }
