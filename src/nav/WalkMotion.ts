@@ -9,9 +9,18 @@ export const EYE_HEIGHT_RANGE = { min: 0.2, max: 6 } as const;
 const RISE_METRES_PER_SECOND = 1.1;
 
 /**
- * The DOM-free half of walk navigation: a camera state machine over held keys,
- * accumulated look deltas and the scene's bounding box. `WalkControls` owns the
- * listeners that drive it; everything here can be stepped a frame at a time.
+ * First-person walk state, tuned for standing still and staring at a wall.
+ *
+ * Both translation and rotation are critically damped rather than snapped:
+ * judging a colour needs a stable image, and a camera that eases into place
+ * beats one that jitters with every mouse tick.
+ *
+ * No collision — as specified. Movement is clamped to the scene bounding box
+ * (slightly inset) so you can't wander off into the void.
+ *
+ * There is no DOM here: it is a state machine over held keys, accumulated look
+ * deltas and that bounding box, so it can be stepped a frame at a time in a
+ * test. `WalkControls` owns the listeners that drive it.
  *
  * Eye height lives here while walk mode runs — the scroll wheel and Q/E both
  * move it — but the module never *owns* the persisted value. Every change
@@ -59,6 +68,11 @@ export class WalkMotion {
 
   setBounds(bounds: Box3 | null): void {
     this.bounds = bounds;
+  }
+
+  /** Clamped because a hand-edited or imported settings file can carry anything. */
+  setSpeed(value: number): void {
+    this.speed = MathUtils.clamp(value, 0.2, 20);
   }
 
   /** The floor the eye stands on; 0 until a scene has given us its bounds. */

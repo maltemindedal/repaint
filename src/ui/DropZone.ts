@@ -44,13 +44,6 @@ export class DropZone {
     const file = event.dataTransfer?.files?.[0];
     if (file) this.onFile(file);
   };
-
-  dispose(): void {
-    window.removeEventListener('dragenter', this.onDragEnter);
-    window.removeEventListener('dragover', this.onDragOver);
-    window.removeEventListener('dragleave', this.onDragLeave);
-    window.removeEventListener('drop', this.onDrop);
-  }
 }
 
 function hasFiles(event: DragEvent): boolean {
