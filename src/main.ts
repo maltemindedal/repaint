@@ -2,8 +2,9 @@ import './style.css';
 import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
+import { PaintController, type PaintChange } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
-import { defaultPose } from './core/processScene.ts';
+import { SceneSession } from './core/SceneSession.ts';
 import { NavigationController } from './nav/NavigationController.ts';
 import { AppStore } from './state/store.ts';
 import { Sidebar } from './ui/Sidebar.ts';
@@ -20,7 +21,14 @@ import {
   requireElement,
   pickFile,
 } from './util/dom.ts';
-import type { LoadedScene, NavMode, SchemeView, SceneSettings } from './types.ts';
+import type {
+  AppliedSettingKey,
+  LoadedScene,
+  NavMode,
+  PaintTarget,
+  SchemeView,
+  SceneSettings,
+} from './types.ts';
 
 class App {
   private viewer: Viewer;
@@ -29,13 +37,14 @@ class App {
   private picker: Picker;
   private nav: NavigationController;
   private store = new AppStore();
+  private session: SceneSession;
+  private paint = new PaintController(this.registry, this.store);
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
   private debug: DebugPanel;
   private help: HelpOverlay;
 
-  private scene: LoadedScene | null = null;
   private selectedKey: string | null = null;
   private perfChecked = false;
   private loadedAt = 0;
@@ -49,10 +58,23 @@ class App {
     this.loader = new SceneLoader(this.viewer);
     this.picker = new Picker(this.viewer, this.registry);
     this.nav = new NavigationController(this.viewer);
+    this.session = new SceneSession(
+      {
+        camera: this.viewer.camera,
+        registry: this.registry,
+        picker: this.picker,
+        nav: this.nav,
+        store: this.store,
+      },
+      {
+        applySettings: () => this.applyStoredSettings(),
+        targetsChanged: (targets) => this.renderTargets(targets),
+      },
+    );
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
-      onColorChange: (key, hex) => this.setColor(key, hex),
+      onColorChange: (key, hex) => this.paint.apply(key, hex),
       onResetTarget: (key) => this.resetTarget(key),
       onResetAll: () => this.resetAll(),
       onTagChange: (name, tagged) => this.setTag(name, tagged),
@@ -90,12 +112,15 @@ class App {
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
+    this.paint.onPaintChanged = (change) => this.renderPaintChange(change);
+
     this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
     this.picker.onDoubleClick = (point) => this.nav.focusPoint(point);
 
     this.nav.onModeChange = (mode) => this.toolbar.setMode(mode);
     this.nav.onPoseChange = (mode, pose) => this.store.setPose(mode, pose);
+    this.nav.walk.onEyeHeightChange = (value) => this.storeEyeHeight(value);
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pagehide', () => this.store.flush());
@@ -110,7 +135,7 @@ class App {
 
     this.setScene(this.loader.loadFallback());
     this.viewer.start();
-    this.status('Drop a .glb anywhere to load your apartment. Press ? for shortcuts.', 6000);
+    this.panel.status('Drop a .glb anywhere to load your apartment. Press ? for shortcuts.', 6000);
 
     // Console handle for poking at a scene that doesn't behave — see README.
     // Dev-only so the production bundle keeps nothing alive that the UI doesn't.
@@ -128,26 +153,26 @@ class App {
       try {
         this.store.importJSON(await file.text(), 'merge');
         this.refreshAll();
-        this.status(`Imported settings from ${file.name}`);
+        this.panel.status(`Imported settings from ${file.name}`);
       } catch (err) {
         console.error(err);
-        this.status(`Could not read ${file.name} as settings JSON`, 5000);
+        this.panel.status(`Could not read ${file.name} as settings JSON`, 5000);
       }
       return;
     }
 
     if (!name.endsWith('.glb') && !name.endsWith('.gltf')) {
-      this.status('Only .glb / .gltf (or a settings .json) can be dropped here.', 4000);
+      this.panel.status('Only .glb / .gltf (or a settings .json) can be dropped here.', 4000);
       return;
     }
 
-    this.showLoading(0, 'Reading file…');
+    this.panel.showLoading(0, 'Reading file…');
     try {
       const scene = await this.loader.loadFile(file, (fraction, label) =>
-        this.showLoading(fraction, label),
+        this.panel.showLoading(fraction, label),
       );
       this.setScene(scene);
-      this.status(
+      this.panel.status(
         `${file.name} — ${this.registry.size} paintable ${this.registry.size === 1 ? 'material' : 'materials'}`,
         5000,
       );
@@ -159,9 +184,9 @@ class App {
             'If this file is compressed, use the served build (npm run serve:dist).',
         );
       }
-      this.status(`Could not load ${file.name}. See the console for details.`, 6000);
+      this.panel.status(`Could not load ${file.name}. See the console for details.`, 6000);
     } finally {
-      this.hideLoading();
+      this.panel.hideLoading();
     }
   }
 
@@ -170,104 +195,63 @@ class App {
     if (file) await this.handleFile(file);
   }
 
+  /** The scene on screen. `SceneSession` owns making it so. */
+  private get scene(): LoadedScene | null {
+    return this.session.scene;
+  }
+
   private setScene(scene: LoadedScene): void {
-    this.scene = scene;
     this.perfChecked = false;
     this.loadedAt = performance.now();
 
-    this.store.useScene(scene.key);
+    this.session.load(scene);
 
-    // Baked scenes shouldn't be double-lit, but a scene *without* a bake
-    // clearly wants its exported lights on. Only guess when the user hasn't
-    // already made a call for this file.
-    if (this.store.scene.settings.punctualLights === undefined && scene.lights.length > 0) {
-      this.store.setSetting('punctualLights', !scene.hasBakedTextures);
-    }
-
-    // ORM-packed occlusion can't drive a lightmap, so for those materials the
-    // AO slider is the whole effect. The global default of 0 (right for
-    // lightmapped scenes, where the bake already contains its occlusion) would
-    // silently disable it — give this file a default of 1 unless the user has
-    // already chosen a value.
-    if (
-      this.store.scene.settings.aoMapIntensity === undefined &&
-      scene.aoOnlyMaterials.length > 0
-    ) {
-      this.store.setSetting('aoMapIntensity', 1);
-    }
-
-    this.rediscover();
-    this.picker.setScene(scene.root);
-
-    this.nav.setBounds(scene.bounds);
-    if (scene.startCamFov) {
-      this.viewer.camera.fov = scene.startCamFov;
-      this.viewer.camera.updateProjectionMatrix();
-    }
-
-    const savedPose = this.store.getPose(this.nav.mode);
-    this.nav.applyPose(savedPose ?? scene.startCam ?? defaultPose(scene.bounds));
-
-    this.applySettings();
     this.sidebar.setFileLabel(scene.label);
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.renderSchemes();
     this.renderLibrary();
 
     if (!scene.isFallback && this.registry.size === 0) {
-      this.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
+      this.panel.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
     }
   }
 
-  /** Re-runs discovery (after load, or after a manual tag change). */
-  private rediscover(): void {
-    if (!this.scene) return;
-    const prefs = this.store.scene;
-    this.registry.discover(this.scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
-
-    // Restore whatever colours were on screen last time.
-    for (const [key, hex] of Object.entries(this.store.currentColors)) {
-      this.registry.setColor(key, hex);
-    }
-
-    this.picker.refreshTargets();
-    this.sidebar.renderPaintTargets(this.registry.list(), this.store.library);
+  /** The session's paint targets changed: after a load, a tag, or an import. */
+  private renderTargets(targets: PaintTarget[]): void {
+    this.sidebar.renderPaintTargets(targets, this.store.library);
     if (this.selectedKey && !this.registry.get(this.selectedKey)) this.selectedKey = null;
     this.sidebar.setSelected(this.selectedKey, false);
   }
 
   // -------------------------------------------------------------- colour
 
-  private setColor(key: string, hex: string): void {
-    if (!this.registry.setColor(key, hex)) return;
-    this.store.setCurrentColor(key, hex);
-    this.store.setActiveScheme(null);
-    this.toolbar.renderSchemes({ schemes: this.store.schemes, activeId: null });
+  /**
+   * The single place a paint change reaches the views. Every repaint — picker
+   * drag, library click, scheme, reset — arrives here, so no call site can
+   * update half the UI and leave the other half stale.
+   */
+  private renderPaintChange(change: PaintChange): void {
+    for (const [key, hex] of change.colors) this.sidebar.updateTarget(key, hex);
+
+    const selectedHex = this.selectedKey ? change.colors.get(this.selectedKey) : undefined;
+    if (selectedHex) this.sidebar.syncPicker(selectedHex);
+
+    // Only when the slots or the active one actually moved — a picker drag
+    // fires this dozens of times a second and must not rebuild them.
+    if (change.schemes) this.renderSchemes(change.schemes);
   }
 
   private resetTarget(key: string): void {
-    const target = this.registry.get(key);
+    const target = this.paint.reset(key);
     if (!target) return;
-    this.registry.resetColor(key);
-    this.store.clearCurrentColor(key);
-    this.sidebar.updateTarget(key, target.currentHex);
-    if (this.selectedKey === key) this.sidebar.syncPicker(target.currentHex);
-    this.status(`${target.displayName} → exported colour ${target.exportedHex.toUpperCase()}`);
+    this.panel.status(
+      `${target.displayName} → exported colour ${target.exportedHex.toUpperCase()}`,
+    );
   }
 
   private resetAll(): void {
-    this.registry.resetAll();
-    for (const target of this.registry.list()) {
-      this.store.clearCurrentColor(target.key);
-      this.sidebar.updateTarget(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(null);
-    this.renderSchemes();
-    this.status('All walls back to their exported colours');
+    this.paint.resetAll();
+    this.panel.status('All walls back to their exported colours');
   }
 
   private select(key: string | null): void {
@@ -284,59 +268,48 @@ class App {
     if (!entry) return;
     this.sidebar.focusLibraryEntry(entry.id);
     this.renderLibrary();
-    this.status('Saved to library — type a name in the sidebar');
+    this.panel.status('Saved to library — type a name in the sidebar');
   }
 
   private applyLibraryColor(id: string): void {
     const entry = this.store.library.find((c) => c.id === id);
     if (!entry) return;
     if (!this.selectedKey) {
-      this.status('Select a wall first, then click a library colour.', 3500);
+      this.panel.status('Select a wall first, then click a library colour.', 3500);
       return;
     }
-    this.setColor(this.selectedKey, entry.hex);
-    this.sidebar.updateTarget(this.selectedKey, entry.hex);
-    this.sidebar.syncPicker(entry.hex);
-    this.status(`${entry.name} applied`);
+    if (!this.paint.apply(this.selectedKey, entry.hex)) return;
+    this.panel.status(`${entry.name} applied`);
   }
 
   // ------------------------------------------------------------- schemes
 
   private applyScheme(id: string): void {
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    if (!scheme) return;
-    const count = Object.keys(scheme.colors).length;
-    if (count === 0) {
-      this.status(`“${scheme.name}” is empty — use “Save current” to fill it.`, 4000);
+    const result = this.paint.applyScheme(id);
+    if (result.outcome === 'missing') return;
+    if (result.outcome === 'empty') {
+      this.panel.status(`“${result.scheme.name}” is empty — use “Save current” to fill it.`, 4000);
       return;
     }
-
-    const applied = this.registry.applyScheme(scheme.colors);
-    for (const target of this.registry.list()) {
-      this.sidebar.updateTarget(target.key, target.currentHex);
-      this.store.setCurrentColor(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    this.status(`${scheme.name} — ${applied}/${count} colours applied`);
+    this.panel.status(
+      `${result.scheme.name} — ${result.applied}/${result.requested} colours applied`,
+    );
   }
 
   private captureScheme(id: string): void {
-    this.store.saveScheme(id, this.registry.capture());
-    this.store.setActiveScheme(id);
-    this.renderSchemes();
-    const scheme = this.store.schemes.find((s) => s.id === id);
-    this.status(`Saved current colours into “${scheme?.name ?? id}”`);
+    const scheme = this.paint.capture(id);
+    if (!scheme) return;
+    this.panel.status(`Saved current colours into “${scheme.name}”`);
   }
 
-  private renderSchemes(): void {
-    const view: SchemeView = { schemes: this.store.schemes, activeId: this.store.activeSchemeId };
-    this.toolbar.renderSchemes(view);
-    this.sidebar.renderSchemes(view);
+  /** Both scheme views, always together. Defaults to whatever the store holds. */
+  private renderSchemes(view?: SchemeView): void {
+    const next: SchemeView = view ?? {
+      schemes: this.store.schemes,
+      activeId: this.store.activeSchemeId,
+    };
+    this.toolbar.renderSchemes(next);
+    this.sidebar.renderSchemes(next);
   }
 
   private renderLibrary(): void {
@@ -344,11 +317,11 @@ class App {
   }
 
   private refreshAll(): void {
-    this.rediscover();
+    this.session.rediscover();
     this.sidebar.renderMaterials(this.registry.allMaterials());
     this.renderSchemes();
     this.renderLibrary();
-    this.applySettings();
+    this.applyStoredSettings();
   }
 
   // ------------------------------------------------------------- tagging
@@ -356,9 +329,11 @@ class App {
   private setTag(materialName: string, tagged: boolean): void {
     const info = this.registry.allMaterials().find((m) => m.name === materialName);
     this.store.setTagged(materialName, tagged, info?.auto ?? false);
-    this.rediscover();
+    this.session.rediscover();
     this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.status(`${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`);
+    this.panel.status(
+      `${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`,
+    );
   }
 
   // ------------------------------------------------------------ settings
@@ -378,8 +353,10 @@ class App {
     }
     for (const light of this.scene?.lights ?? []) light.visible = s.punctualLights;
 
-    this.nav.setEyeHeight(s.eyeHeight);
-    this.nav.setWalkSpeed(s.walkSpeed);
+    // Eye height is deliberately absent: walk mode moves it (wheel, Q/E) and
+    // reports back, so pushing the stored value here would undo whatever the
+    // user just did every time any other setting changed.
+    this.nav.walk.setSpeed(s.walkSpeed);
     this.picker.highlightsEnabled = s.highlights;
     if (!s.highlights) this.picker.clearHighlights();
 
@@ -387,15 +364,52 @@ class App {
     this.debug.syncSettings(s);
   }
 
-  private setSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
+  private setSetting<K extends AppliedSettingKey>(key: K, value: SceneSettings[K]): void {
     this.store.setSetting(key, value);
     this.applySettings();
+  }
+
+  /**
+   * The one direction eye height flows *into* walk mode: a scene (or an
+   * imported file) arrives carrying a height this session hasn't seen. Every
+   * other change runs the other way, through `storeEyeHeight`.
+   *
+   * `adoptEyeHeight`, not `setEyeHeight`, because this value came *from* the
+   * store — reporting it back would write a height into the prefs of every
+   * scene merely opened, quietly opting it out of the default for ever.
+   */
+  private seedEyeHeight(): void {
+    this.nav.walk.adoptEyeHeight(this.store.settings.eyeHeight);
+  }
+
+  /**
+   * Everything the store pushes back out into the world, in the order it has
+   * to go: the eye height walk mode has not seen, then the rest of the
+   * settings. Both a scene load and an import need the pair, and a scene load
+   * gets here through `SceneSession`, which decides when it is safe.
+   */
+  private applyStoredSettings(): void {
+    this.seedEyeHeight();
+    this.applySettings();
+  }
+
+  /**
+   * Walk mode is the live owner of eye height while you're in it — the wheel,
+   * Q/E and the debug slider all move it there — and the store is the owner of
+   * the persisted value. This is the seam between them. It writes the store
+   * directly rather than going through `setSetting`, which would re-apply every
+   * setting on every wheel tick and push the value straight back into the
+   * module that just moved it.
+   */
+  private storeEyeHeight(value: number): void {
+    this.store.setSetting('eyeHeight', value);
+    this.debug.syncSettings(this.store.settings);
   }
 
   private toggleToneMapping(): void {
     const next = !this.store.settings.toneMapping;
     this.setSetting('toneMapping', next);
-    this.status(
+    this.panel.status(
       next
         ? 'ACES filmic tone mapping ON — looks like your Cycles render'
         : 'Tone mapping OFF — on-screen colour now matches the hex literally',
@@ -406,8 +420,12 @@ class App {
   private debugHooks() {
     return {
       settings: this.store.settings,
-      setSetting: <K extends keyof SceneSettings>(key: K, value: SceneSettings[K]) =>
+      setSetting: <K extends AppliedSettingKey>(key: K, value: SceneSettings[K]) =>
         this.setSetting(key, value),
+      // Not `setSetting`: the slider is one more way to move the height walk
+      // mode owns, so it goes in the same way the wheel does and comes back out
+      // through `onEyeHeightChange`.
+      setEyeHeight: (value: number) => this.nav.walk.setEyeHeight(value),
       setBackground: (hex: string) => this.viewer.setBackground(hex),
       setMaxPixelRatio: (value: number) => this.viewer.setMaxPixelRatio(value),
       frameScene: () => this.nav.frameScene(),
@@ -441,7 +459,7 @@ class App {
     this.nav.setMode(mode);
     if (saved) this.nav.applyPose(saved);
     this.toolbar.setMode(mode);
-    this.status(
+    this.panel.status(
       mode === 'walk'
         ? 'Walk mode — WASD to move, drag to look, L for pointer lock'
         : 'Orbit mode — drag to orbit, double-click to set the pivot',
@@ -473,7 +491,7 @@ class App {
       }
       case 'KeyR':
         if (this.selectedKey) this.resetTarget(this.selectedKey);
-        else this.status('Select a wall first (click it, or pick it in the sidebar).', 3000);
+        else this.panel.status('Select a wall first (click it, or pick it in the sidebar).', 3000);
         return;
       case 'KeyT':
         this.toggleToneMapping();
@@ -485,11 +503,11 @@ class App {
         this.nav.frameScene();
         return;
       case 'KeyL':
-        if (this.nav.mode === 'walk') this.nav.walk.requestPointerLock();
+        if (this.nav.mode === 'walk') this.nav.walkInput.requestPointerLock();
         return;
       case 'Escape':
         if (this.help.isVisible) this.help.hide();
-        else if (this.nav.walk.isPointerLocked) this.nav.walk.exitPointerLock();
+        else if (this.nav.walkInput.isPointerLocked) this.nav.walkInput.exitPointerLock();
         else this.select(null);
         return;
       default:
@@ -513,15 +531,15 @@ class App {
         .replace(/(^-|-$)/g, '') || 'custom';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
-    this.status('Rendering 2× screenshot…');
+    this.panel.status('Rendering 2× screenshot…');
     const blob = await this.viewer.screenshot(2);
     if (!blob) {
-      this.status('Screenshot failed — the drawing buffer came back empty.', 4000);
+      this.panel.status('Screenshot failed — the drawing buffer came back empty.', 4000);
       return;
     }
     const filename = `repaint_${slug}_${stamp}.png`;
     downloadBlob(blob, filename);
-    this.status(`Saved ${filename}`, 4000);
+    this.panel.status(`Saved ${filename}`, 4000);
   }
 
   // -------------------------------------------------------- import/export
@@ -529,7 +547,7 @@ class App {
   private exportData(): void {
     const stamp = new Date().toISOString().slice(0, 10);
     downloadText(this.store.exportJSON(), `repaint-${stamp}.json`);
-    this.status('Exported schemes, library and settings');
+    this.panel.status('Exported schemes, library and settings');
   }
 
   private async importData(): Promise<void> {
@@ -538,10 +556,10 @@ class App {
     try {
       this.store.importJSON(await file.text(), 'merge');
       this.refreshAll();
-      this.status(`Imported ${file.name}`);
+      this.panel.status(`Imported ${file.name}`);
     } catch (err) {
       console.error(err);
-      this.status('That file is not a valid Repaint export.', 5000);
+      this.panel.status('That file is not a valid Repaint export.', 5000);
     }
   }
 
@@ -583,19 +601,7 @@ class App {
       lines.push(`  · ${stats.meshes} draw calls. Join meshes that share a material in Blender.`);
     }
     console.warn(lines.join('\n'));
-    this.status(`~${fps.toFixed(0)} fps — see the console for compression hints.`, 6000);
-  }
-
-  private status(message: string, duration = 2600): void {
-    this.panel.status(message, duration);
-  }
-
-  private showLoading(fraction: number, label: string): void {
-    this.panel.showLoading(fraction, label);
-  }
-
-  private hideLoading(): void {
-    this.panel.hideLoading();
+    this.panel.status(`~${fps.toFixed(0)} fps — see the console for compression hints.`, 6000);
   }
 }
 

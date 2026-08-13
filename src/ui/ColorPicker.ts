@@ -142,13 +142,27 @@ export class ColorPicker {
           class: 'chip',
           style: `background:${entry.hex}`,
           title: `${entry.name} · ${entry.hex.toUpperCase()}`,
-          onclick: () => this.setHex(entry.hex),
+          onclick: () => this.pick(entry.hex),
         }),
       );
     }
   }
 
-  setHex(hex: string): void {
+  /**
+   * Shows a colour that has already been applied elsewhere — a scheme, the
+   * sidebar library, a reset. Silent on purpose: notifying here would push the
+   * change back into the paint fan-out that produced it, which at best re-does
+   * the write and at worst clears the scheme selection that caused it.
+   */
+  showHex(hex: string): void {
+    const parsed = normalizeHex(hex);
+    if (!parsed || parsed === this.currentHex()) return;
+    this.hsv = hexToHsv(parsed);
+    this.sync();
+  }
+
+  /** A colour chosen *inside* the picker — applies it and tells the app. */
+  private pick(hex: string): void {
     const parsed = normalizeHex(hex);
     if (!parsed) return;
     this.hsv = hexToHsv(parsed);
@@ -168,11 +182,6 @@ export class ColorPicker {
 
     if (!keepInput) this.hexInput.value = hex.toUpperCase();
     if (notify) this.options.onChange(hex);
-  }
-
-  focusHex(): void {
-    this.hexInput.focus();
-    this.hexInput.select();
   }
 }
 

@@ -304,7 +304,8 @@ this tool genuinely beats a paint chart; absolute colour accuracy is not.
   Can't drop below the floor. **Double-click any surface** to ease the pivot onto
   that point, which is how you get the camera to behave in a tight room.
 - **Walk** — `WASD`, `Shift` to move faster, `Q`/`E` or scroll for eye height,
-  drag to look. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
+  drag to look. Eye height is saved as you change it, so nothing stands you back
+  up. `L` grabs pointer lock for a proper FPS feel; `Esc` releases it.
   While locked, clicking picks the wall under the centre of the screen. There's no
   collision (by design) — you're clamped to the scene's bounding box so you can't
   get lost.
@@ -425,16 +426,21 @@ src/
   core/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
     SceneLoader.ts         GLB → LoadedScene, disposal, load report
+    SceneSession.ts        Scene activation: prefs, discovery, picker, camera —
+                           the activation order lives here, not in the caller
     loaders.ts             GLTFLoader + DRACO / KTX2 / meshopt
     processScene.ts        Renderer-free: lightmap wiring, bounds, START_CAM, stats
     PaintRegistry.ts       Discovery + the single write path for material.color
+    PaintController.ts     The paint fan-out: registry + store + one change event
     Picker.ts              Raycast hover/select, emissive highlight
     materials.ts           Shared material type guards
     fallbackScene.ts       Procedural demo room (also the smoke-test fixture)
   nav/
     NavigationController.ts  Mode switching, pose save/restore, double-click focus
-    WalkControls.ts          Damped first-person controls; settle-detection for
-                             persisting the walk pose after you stop moving
+    WalkControls.ts          Pointer/wheel/key listeners for first-person mode
+    WalkMotion.ts            DOM-free camera state machine: damped movement over
+                             keys/bounds, settle-detection for persisting the
+                             walk pose, and the one funnel for eye height
   state/
     store.ts               All persisted state, debounced writes
     storage.ts             localStorage + memory fallback; validating migration
@@ -445,20 +451,43 @@ src/
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
-  smoke.test.ts            24 tests over the fallback scene
+  smoke.test.ts            25 tests over the fallback scene
+  sceneSession.test.ts     17 tests pinning the scene-activation order
+  paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
+  walk-motion.test.ts        12 tests pinning eye-height ownership
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
-`processScene.ts` and `PaintRegistry.ts` deliberately need no renderer, which is
-what lets the smoke test run the real pipeline headlessly in node:
+A colour change has to reach four places — the registry (what's on the GPU), the
+store (what survives a reload), the sidebar and the toolbar. `PaintController`
+owns that fan-out so no _edit_ can do half of it: it writes the registry and
+the store, then emits one change carrying the targets that actually moved and,
+only when they went stale, the scheme rows to re-render. `main.ts` subscribes
+once and updates both views from there. (Restoring saved colours after a load
+goes straight to the registry — `SceneSession` is _reading_ the store there, so
+it has nothing to write back.) That "only when stale" is what keeps a picker
+drag cheap: it fires a paint per pointermove, and rebuilding the toolbar scheme
+slots each time would undo the targeted row update the sidebar does.
+
+`processScene.ts`, `PaintRegistry.ts`, `PaintController.ts`, `SceneSession.ts` and
+`WalkMotion.ts` deliberately need no renderer, which is what lets the tests run the
+real pipeline headlessly in node:
 
 ```bash
 npm test
 ```
 
-It builds the procedural room, runs discovery against it, and checks the colour
+They build the procedural room, run discovery against it, and check the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
-ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
+ORM-vs-lightmap classification, and that corrupt saved data is sanitised. The
+fan-out is covered against a fake store: which walls each operation reports, and
+that the scheme rows are asked to re-render exactly when the slots change and
+not once more. The session test drives a real registry and store against a
+recording picker and camera, so the activation order — store slot before
+settings, discovery before the picker, bounds before the pose, settings last —
+fails loudly if anyone reshuffles it. Whether `main.ts` then draws both views is
+browser-side and not covered here — the sidebar/toolbar seam is the next thing
+worth deepening.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

@@ -217,10 +217,9 @@ export class Sidebar {
       hex: target.currentHex,
       exportedHex: target.exportedHex,
       library: this.library,
-      onChange: (hex) => {
-        this.updateTarget(key, hex);
-        this.cb.onColorChange(key, hex);
-      },
+      // The row is updated by the paint change this reports, not from here —
+      // one writer, so a row can never show a colour the scene doesn't have.
+      onChange: (hex) => this.cb.onColorChange(key, hex),
       onSaveToLibrary: (hex) => this.cb.onSaveToLibrary(hex),
       onReset: () => this.cb.onResetTarget(key),
     });
@@ -230,7 +229,7 @@ export class Sidebar {
 
   /** Pushes an externally-applied colour (scheme switch, library click) into the open picker. */
   syncPicker(hex: string): void {
-    this.picker?.setHex(hex);
+    this.picker?.showHex(hex);
   }
 
   // ------------------------------------------------------------- tagging

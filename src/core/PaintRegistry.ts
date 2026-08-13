@@ -63,7 +63,17 @@ export class PaintRegistry {
   private root: Object3D | null = null;
   private scratch = new Color();
 
-  /** Rebuilds from a scene graph. Safe to call again after re-tagging. */
+  /**
+   * Rebuilds from a scene graph. Safe to call again after re-tagging.
+   *
+   * Reads colour, never writes it: `currentHex` comes back on whatever the
+   * graph currently says. Putting back what was on screen belongs to
+   * `SceneSession.discoverTargets`.
+   *
+   * `exportedHex` is the one thing the graph can no longer answer for on a
+   * re-discovery — by then the materials wear the user's paint — so it comes
+   * from `this.exportedHex`, banked on the way past below.
+   */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
     const untagged = new Set(options.untagged ?? []);
@@ -95,10 +105,6 @@ export class PaintRegistry {
       }
     });
 
-    // Preserve any colour already applied to a surviving target across a
-    // re-discovery (e.g. after toggling a manual tag).
-    const previous = new Map([...this.targets].map(([k, t]) => [k, t.currentHex]));
-
     this.targets.clear();
     this.byMaterial.clear();
 
@@ -107,23 +113,18 @@ export class PaintRegistry {
       const paintable = (auto && !untagged.has(group.name)) || tagged.has(group.name);
       if (!paintable) continue;
 
-      const exported = this.exportedHex.get(group.name) ?? hexOf(group.materials[0].color);
+      const live = hexOf(group.materials[0].color);
       const target: PaintTarget = {
         key: group.name,
         displayName: displayNameFor(group.name),
         materials: group.materials,
         meshes: group.meshes,
-        exportedHex: exported,
-        currentHex: previous.get(group.name) ?? exported,
+        exportedHex: this.exportedHex.get(group.name) ?? live,
+        currentHex: live,
         auto,
       };
       this.targets.set(group.name, target);
       for (const mat of group.materials) this.byMaterial.set(mat, group.name);
-    }
-
-    // Re-apply preserved colours so the GPU state matches `currentHex`.
-    for (const target of this.targets.values()) {
-      if (target.currentHex !== target.exportedHex) this.setColor(target.key, target.currentHex);
     }
   }
 

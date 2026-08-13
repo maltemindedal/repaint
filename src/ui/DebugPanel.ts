@@ -1,10 +1,13 @@
 import GUI from 'lil-gui';
 import Stats from 'stats.js';
-import type { SceneSettings, SceneStats } from '../types.ts';
+import { EYE_HEIGHT_RANGE } from '../nav/WalkMotion.ts';
+import type { AppliedSettingKey, SceneSettings, SceneStats } from '../types.ts';
 
 export interface DebugHooks {
   settings: SceneSettings;
-  setSetting: <K extends keyof SceneSettings>(key: K, value: SceneSettings[K]) => void;
+  setSetting: <K extends AppliedSettingKey>(key: K, value: SceneSettings[K]) => void;
+  /** Eye height has its own hook: walk mode owns it, and reports it back. */
+  setEyeHeight: (value: number) => void;
   setBackground: (hex: string) => void;
   setMaxPixelRatio: (value: number) => void;
   frameScene: () => void;
@@ -30,7 +33,6 @@ export class DebugPanel {
   private visible = false;
   private proxy: Record<string, unknown>;
   private infoControllers: { name: string; get: () => string }[] = [];
-  private infoTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private hooks: DebugHooks) {
     this.gui = new GUI({ title: 'Debug  ·  ` to hide', width: 300 });
@@ -118,9 +120,11 @@ export class DebugPanel {
   private buildNavigation(): void {
     const folder = this.gui.addFolder('Navigation');
     folder
-      .add(this.proxy, 'eyeHeight', 0.4, 3, 0.01)
+      // The module's own range, so a scroll to a crouch can't show a value the
+      // slider is unable to represent.
+      .add(this.proxy, 'eyeHeight', EYE_HEIGHT_RANGE.min, EYE_HEIGHT_RANGE.max, 0.01)
       .name('Eye height (m)')
-      .onChange((v: number) => this.hooks.setSetting('eyeHeight', v));
+      .onChange((v: number) => this.hooks.setEyeHeight(v));
     folder
       .add(this.proxy, 'walkSpeed', 0.3, 8, 0.1)
       .name('Walk speed (m/s)')
@@ -152,7 +156,7 @@ export class DebugPanel {
       { name: 'lights', get: () => (this.hooks.hasPunctualLights() ? 'in file' : 'none') },
     ];
     // lil-gui `.listen()` polls the object, so refresh it on a slow timer.
-    this.infoTimer = setInterval(() => {
+    setInterval(() => {
       for (const item of this.infoControllers) {
         (info as Record<string, string>)[item.name] = item.get();
       }
@@ -194,6 +198,12 @@ export class DebugPanel {
       walkSpeed: settings.walkSpeed,
       highlights: settings.highlights,
     });
+    // Scrolling or holding Q/E in walk mode lands here every frame. Repainting
+    // a hidden panel is wasted work — it catches up when it's shown.
+    if (this.visible) this.refreshDisplays();
+  }
+
+  private refreshDisplays(): void {
     this.gui.controllersRecursive().forEach((c) => c.updateDisplay());
   }
 
@@ -211,18 +221,12 @@ export class DebugPanel {
 
   setVisible(visible: boolean): void {
     this.visible = visible;
+    if (visible) this.refreshDisplays();
     this.gui.domElement.style.display = visible ? '' : 'none';
     this.stats.dom.style.display = visible ? '' : 'none';
   }
 
   get isVisible(): boolean {
     return this.visible;
-  }
-
-  dispose(): void {
-    if (this.infoTimer) clearInterval(this.infoTimer);
-    this.infoTimer = null;
-    this.gui.destroy();
-    this.stats.dom.remove();
   }
 }

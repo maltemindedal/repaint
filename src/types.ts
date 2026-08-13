@@ -105,6 +105,15 @@ export interface SceneSettings {
   highlights: boolean;
 }
 
+/**
+ * The settings that are changed by writing the store and re-applying. Eye
+ * height is missing on purpose: walk mode moves it (wheel, Q/E, the debug
+ * slider) and reports back, so it goes in through navigation instead — see
+ * `nav/WalkMotion.ts`. Excluding it here makes the old double-ownership
+ * unrepresentable rather than merely avoided.
+ */
+export type AppliedSettingKey = Exclude<keyof SceneSettings, 'eyeHeight'>;
+
 export interface ScenePrefs {
   /** Material names manually marked paintable when no `PAINT_` prefix exists. */
   tagged: string[];

@@ -7,7 +7,7 @@ import type {
   ScenePrefs,
   SceneSettings,
 } from '../types.ts';
-import { loadData, saveData, migrate, serialize, emptyData } from './storage.ts';
+import { loadData, saveData, migrate, serialize } from './storage.ts';
 import { normalizeHex } from '../util/color.ts';
 
 export const DEFAULT_SETTINGS: SceneSettings = {
@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: SceneSettings = {
   // 0 by default: the same baked texture drives lightMap, so also feeding it
   // into aoMap would multiply the occlusion in twice. Scenes whose occlusion is
   // ORM-packed (AO-only, no lightmap) get a per-scene default of 1 instead —
-  // see App.setScene. See README.
+  // see SceneSession.applyHeuristicDefaults. See README.
   aoMapIntensity: 0.0,
   envIntensity: 0.25,
   punctualLights: false,
@@ -103,10 +103,6 @@ export class AppStore {
         prefs.schemes.push(makeDefaultScheme(prefs.schemes.length));
       }
     }
-  }
-
-  get currentSceneKey(): string {
-    return this.sceneKey;
   }
 
   get scene(): ScenePrefs {
@@ -228,6 +224,17 @@ export class AppStore {
     this.queueSave();
   }
 
+  /**
+   * Records a guess: writes only when this scene has no choice of its own.
+   *
+   * `settings` merges the global defaults in, so it can't answer "has the user
+   * decided this?" — only the raw per-scene block can, and that stays in here.
+   */
+  setDefaultSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
+    if (this.scene.settings[key] !== undefined) return;
+    this.setSetting(key, value);
+  }
+
   // ------------------------------------------------------- import/export
 
   exportJSON(): string {
@@ -247,17 +254,6 @@ export class AppStore {
     }
     this.useScene(this.sceneKey);
     this.flush();
-  }
-
-  resetAll(): void {
-    this.data = emptyData();
-    this.useScene(this.sceneKey);
-    this.flush();
-  }
-
-  /** Raw access for tests. */
-  snapshot(): AppData {
-    return this.data;
   }
 }
 
