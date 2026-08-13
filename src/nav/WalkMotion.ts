@@ -131,12 +131,19 @@ export class WalkMotion {
 
   /**
    * Takes the height the owner already holds — a scene arriving with one of its
-   * own. Deliberately silent: reporting it would be the owner hearing its own
-   * value come back as though the user had moved, which is how a scene the user
-   * never touched ends up with a stored height of its own.
+   * own. Silent when that height was usable: reporting it would be the owner
+   * hearing its own value come back as though the user had moved, which is how
+   * a scene the user never touched ends up with a stored height of its own.
+   *
+   * When it *wasn't* usable, say so. Storage only checks that a setting is a
+   * finite number, so a hand-edited or imported file can carry a height no one
+   * can stand at; clamping it in silence would leave the owner holding a value
+   * walk mode refuses — two truths again.
    */
   adoptEyeHeight(value: number): void {
-    this._eyeHeight = MathUtils.clamp(value, EYE_HEIGHT_RANGE.min, EYE_HEIGHT_RANGE.max);
+    const clamped = MathUtils.clamp(value, EYE_HEIGHT_RANGE.min, EYE_HEIGHT_RANGE.max);
+    this._eyeHeight = clamped;
+    if (clamped !== value) this.onEyeHeightChange?.(clamped);
   }
 
   // ----------------------------------------------------------------- look

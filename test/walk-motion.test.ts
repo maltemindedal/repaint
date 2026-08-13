@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PerspectiveCamera } from 'three';
+import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { EYE_HEIGHT_RANGE, WalkMotion } from '../src/nav/WalkMotion.ts';
 import { AppStore, DEFAULT_SETTINGS } from '../src/state/store.ts';
-import { emptyData } from '../src/state/storage.ts';
+import { emptyData, migrate } from '../src/state/storage.ts';
 
 /**
  * Eye height has one owner: whoever listens to `onEyeHeightChange`. These tests
@@ -92,6 +92,51 @@ describe('eye-height ownership', () => {
     // its own value come back as if the user had moved.
     expect(reported).toEqual([]);
   });
+
+  it('tells its owner when the height it was handed is unusable', () => {
+    const { motion, reported } = walk();
+
+    // Storage only checks that a setting is a finite number, so a hand-edited
+    // or imported file can carry a height no one can stand at.
+    motion.adoptEyeHeight(100);
+
+    expect(motion.eyeHeight).toBe(EYE_HEIGHT_RANGE.max);
+    // Staying silent here is what leaves the owner holding 100 while walk mode
+    // stands at 6 — two truths again, which is the whole thing being fixed.
+    expect(reported).toEqual([EYE_HEIGHT_RANGE.max]);
+  });
+});
+
+describe('standing on the floor', () => {
+  // An exported apartment's floor slab is rarely at the origin, so every eye
+  // height is measured from `bounds.min.y` rather than from y = 0.
+  const FLOOR_Y = 12;
+
+  function bounded() {
+    const camera = new PerspectiveCamera();
+    const motion = new WalkMotion(camera);
+    motion.setBounds(new Box3(new Vector3(-5, FLOOR_Y, -5), new Vector3(5, FLOOR_Y + 3, 5)));
+    motion.setEyeHeight(1.2);
+    return { camera, motion };
+  }
+
+  it('holds the eye above the floor slab, not above the origin', () => {
+    const { camera, motion } = bounded();
+
+    motion.update(1 / 60);
+
+    expect(camera.position.y).toBe(13.2);
+  });
+
+  it('stands the camera up on the floor when walk mode takes over', () => {
+    const { camera, motion } = bounded();
+    // Orbit left the camera up near the ceiling.
+    camera.position.set(2, FLOOR_Y + 2.8, 3);
+
+    motion.syncFromCamera();
+
+    expect(motion.eye.y).toBe(13.2);
+  });
 });
 
 describe('eye height and the store', () => {
@@ -131,5 +176,22 @@ describe('eye height and the store', () => {
     expect(motion.eyeHeight).toBe(DEFAULT_SETTINGS.eyeHeight);
     // Merely opening a scene must not opt it out of the default for good.
     expect(store.scene.settings.eyeHeight).toBeUndefined();
+  });
+
+  it('corrects a stored height that walk mode refuses', () => {
+    const store = new AppStore(
+      migrate({ version: 1, scenes: { 'x.glb': { settings: { eyeHeight: 100 } } } }),
+    );
+    store.useScene('x.glb');
+
+    const motion = new WalkMotion(new PerspectiveCamera());
+    motion.onEyeHeightChange = (value) => store.setSetting('eyeHeight', value);
+
+    motion.adoptEyeHeight(store.settings.eyeHeight);
+
+    expect(motion.eyeHeight).toBe(EYE_HEIGHT_RANGE.max);
+    // The store is the single truth, so it must not go on holding a height
+    // nothing will ever use.
+    expect(store.settings.eyeHeight).toBe(EYE_HEIGHT_RANGE.max);
   });
 });

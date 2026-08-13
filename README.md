@@ -449,7 +449,7 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
-  walk-motion.test.ts      8 tests pinning eye-height ownership
+  walk-motion.test.ts      12 tests pinning eye-height ownership
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
