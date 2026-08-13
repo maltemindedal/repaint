@@ -453,11 +453,7 @@ class App {
 
   private setMode(mode: NavMode): void {
     if (mode === this.nav.mode) return;
-    // Read the saved pose *before* switching: setMode emits the carried-over
-    // camera pose for the new mode, which would overwrite the stored one.
-    const saved = this.store.getPose(mode);
-    this.nav.setMode(mode);
-    if (saved) this.nav.applyPose(saved);
+    this.nav.switchMode(mode, this.store.getPose(mode));
     this.toolbar.setMode(mode);
     this.panel.status(
       mode === 'walk'
@@ -503,11 +499,11 @@ class App {
         this.nav.frameScene();
         return;
       case 'KeyL':
-        if (this.nav.mode === 'walk') this.nav.walkInput.requestPointerLock();
+        this.nav.requestPointerLock();
         return;
       case 'Escape':
         if (this.help.isVisible) this.help.hide();
-        else if (this.nav.walkInput.isPointerLocked) this.nav.walkInput.exitPointerLock();
+        else if (this.nav.isPointerLocked) this.nav.exitPointerLock();
         else this.select(null);
         return;
       default:

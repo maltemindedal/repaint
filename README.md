@@ -436,7 +436,8 @@ src/
     materials.ts           Shared material type guards
     fallbackScene.ts       Procedural demo room (also the smoke-test fixture)
   nav/
-    NavigationController.ts  Mode switching, pose save/restore, double-click focus
+    NavigationController.ts  Mode switching, pose save/restore, pointer lock,
+                             double-click focus
     WalkControls.ts          Pointer/wheel/key listeners for first-person mode
     WalkMotion.ts            DOM-free camera state machine: damped movement over
                              keys/bounds, settle-detection for persisting the
@@ -452,6 +453,7 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            23 tests over the fallback scene
+  navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
   sceneSession.test.ts     16 tests pinning the scene-activation order
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
   walk-motion.test.ts        12 tests pinning eye-height ownership

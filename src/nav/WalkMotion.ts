@@ -80,7 +80,14 @@ export class WalkMotion {
     return this.bounds ? this.bounds.min.y : 0;
   }
 
-  /** Adopts the camera's transform, standing the eye at walking height. */
+  /**
+   * Adopts the camera's transform, standing the eye at walking height.
+   *
+   * Writes the eye straight back to the camera rather than waiting for the next
+   * `update()`: a pose read in between would pair the camera's old height with
+   * a target computed from the new one, which is neither what renders nor a
+   * coherent pose to restore — it reconstructs as a downward tilt.
+   */
   syncFromCamera(): void {
     this.position.copy(this.camera.position);
     this.position.y = this.floorY + this._eyeHeight;
@@ -88,6 +95,7 @@ export class WalkMotion {
     this.yaw = this.targetYaw = this.euler.y;
     this.pitch = this.targetPitch = this.euler.x;
     this.velocity.set(0, 0, 0);
+    this.applyToCamera();
   }
 
   setPose(position: Vector3, target: Vector3): void {
