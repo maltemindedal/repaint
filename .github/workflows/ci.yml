@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch supersedes the run already in flight.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Node's current Active LTS, and what the app is developed against.
+  NODE_VERSION: '24.x'
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Before setup-node: the npm cache path is resolved by asking pnpm for its
+      # store, so pnpm has to be on PATH first. No `version` here — it comes from
+      # the `packageManager` field in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Each check runs even when an earlier one failed, so a single run reports
+      # everything that needs fixing rather than the first thing.
+      - name: Format (oxfmt --check)
+        if: ${{ !cancelled() }}
+        run: pnpm run format:check
+
+      - name: Lint (oxlint)
+        if: ${{ !cancelled() }}
+        run: pnpm run lint
+
+      - name: Typecheck (tsc --noEmit)
+        if: ${{ !cancelled() }}
+        run: pnpm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Vitest
+        run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # `build:portable` runs `build` first, so this covers both the Vite build
+      # and the single-file bundling in scripts/make-portable.mjs.
+      - name: Build dist/ and the portable single file
+        run: pnpm run build:portable
+
+      - name: Check dist/repaint.html was written
+        run: test -s dist/repaint.html
+
+      - name: Upload dist/
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 14
