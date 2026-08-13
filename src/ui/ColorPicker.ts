@@ -4,7 +4,7 @@ import type { LibraryColor } from '../types.ts';
 
 export interface ColorPickerOptions {
   hex: string;
-  originalHex: string;
+  exportedHex: string;
   library: LibraryColor[];
   /** Fires continuously while dragging — cheap, it's one uniform write. */
   onChange: (hex: string) => void;
@@ -61,7 +61,7 @@ export class ColorPicker {
     const resetBtn = el('button', {
       class: 'btn',
       text: 'Reset',
-      title: `Back to the exported colour (${options.originalHex.toUpperCase()})`,
+      title: `Back to the exported colour (${options.exportedHex.toUpperCase()})`,
       onclick: () => this.options.onReset(),
     });
 

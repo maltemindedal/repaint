@@ -4,6 +4,7 @@ import {
   Group,
   Mesh,
   MeshStandardMaterial,
+  type Object3D,
   PlaneGeometry,
   RGBAFormat,
   SRGBColorSpace,
@@ -27,6 +28,15 @@ function buildScene() {
   const registry = new PaintRegistry();
   registry.discover(root);
   return { root, processed, registry };
+}
+
+/** The wall mesh wearing `materialName` — discovery is by material, never mesh. */
+function findWall(root: Object3D, materialName: string): Mesh {
+  const wall = root.children.find(
+    (c) => ((c as Mesh).material as MeshStandardMaterial)?.name === materialName,
+  ) as Mesh | undefined;
+  if (!wall) throw new Error(`No mesh uses material ${materialName}`);
+  return wall;
 }
 
 describe('fallback scene', () => {
@@ -102,9 +112,7 @@ describe('material discovery', () => {
 
   it('resolves a raycast hit back to its target', () => {
     const { root, registry } = buildScene();
-    const wall = root.children.find(
-      (c) => ((c as Mesh).material as MeshStandardMaterial)?.name === 'PAINT_Living_North',
-    ) as Mesh;
+    const wall = findWall(root, 'PAINT_Living_North');
 
     expect(registry.targetForMaterial(wall.material)?.key).toBe('PAINT_Living_North');
   });
@@ -137,14 +145,14 @@ describe('colour pipeline', () => {
   it('resets a wall to its exported colour', () => {
     const { registry } = buildScene();
     const target = registry.get('PAINT_Living_East')!;
-    const original = target.originalHex;
+    const exported = target.exportedHex;
 
     registry.setColor(target.key, '#ff0000');
     expect(target.currentHex).toBe('#ff0000');
 
     registry.resetColor(target.key);
-    expect(target.currentHex).toBe(original);
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(original.slice(1));
+    expect(target.currentHex).toBe(exported);
+    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(exported.slice(1));
   });
 
   it('captures and re-applies a scheme', () => {
@@ -182,7 +190,7 @@ describe('colour pipeline', () => {
 
   it('still knows the exported colour after a re-discovery of a painted scene', () => {
     const { root, registry } = buildScene();
-    const exported = registry.get('PAINT_Living_North')!.originalHex;
+    const exported = registry.get('PAINT_Living_North')!.exportedHex;
     expect(exported).not.toBe('#abcdef');
 
     registry.setColor('PAINT_Living_North', '#abcdef');
@@ -191,7 +199,7 @@ describe('colour pipeline', () => {
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
     const target = registry.get('PAINT_Living_North')!;
-    expect(target.originalHex).toBe(exported);
+    expect(target.exportedHex).toBe(exported);
 
     registry.resetColor(target.key);
     expect(target.currentHex).toBe(exported);
@@ -205,13 +213,11 @@ describe('colour pipeline', () => {
     // A fresh load brings its own materials — the previous scene's exported
     // colours must not leak into it.
     const other = createFallbackScene();
-    const wall = other.children.find(
-      (c) => ((c as Mesh).material as MeshStandardMaterial)?.name === 'PAINT_Living_North',
-    ) as Mesh;
+    const wall = findWall(other, 'PAINT_Living_North');
     (wall.material as MeshStandardMaterial).color.setStyle('#102030', SRGBColorSpace);
     registry.discover(other);
 
-    expect(registry.get('PAINT_Living_North')!.originalHex).toBe('#102030');
+    expect(registry.get('PAINT_Living_North')!.exportedHex).toBe('#102030');
   });
 });
 

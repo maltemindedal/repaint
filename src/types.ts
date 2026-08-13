@@ -22,7 +22,7 @@ export interface PaintTarget {
   materials: MeshStandardMaterial[];
   meshes: Mesh[];
   /** sRGB hex (`#rrggbb`) the GLB shipped with. */
-  originalHex: string;
+  exportedHex: string;
   currentHex: string;
   /** True when discovered via the `PAINT_` prefix, false when manually tagged. */
   auto: boolean;

@@ -252,7 +252,7 @@ class App {
     this.store.clearCurrentColor(key);
     this.sidebar.updateTarget(key, target.currentHex);
     if (this.selectedKey === key) this.sidebar.syncPicker(target.currentHex);
-    this.status(`${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`);
+    this.status(`${target.displayName} → exported colour ${target.exportedHex.toUpperCase()}`);
   }
 
   private resetAll(): void {

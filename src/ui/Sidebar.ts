@@ -155,7 +155,7 @@ export class Sidebar {
           el('button', {
             class: 'btn ghost',
             text: '↺',
-            title: `Reset to exported colour (${target.originalHex.toUpperCase()})`,
+            title: `Reset to exported colour (${target.exportedHex.toUpperCase()})`,
             onclick: (event: Event) => {
               event.stopPropagation();
               this.cb.onResetTarget(target.key);
@@ -215,7 +215,7 @@ export class Sidebar {
     clear(refs.holder);
     this.picker = new ColorPicker({
       hex: target.currentHex,
-      originalHex: target.originalHex,
+      exportedHex: target.exportedHex,
       library: this.library,
       onChange: (hex) => {
         this.updateTarget(key, hex);
