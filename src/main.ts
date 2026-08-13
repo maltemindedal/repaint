@@ -12,6 +12,7 @@ import { DropZone } from './ui/DropZone.ts';
 import { DebugPanel } from './ui/DebugPanel.ts';
 import { HelpOverlay } from './ui/HelpOverlay.ts';
 import { StatusPanel } from './ui/StatusPanel.ts';
+import { bootWhenSupported } from './ui/MobileGate.ts';
 import {
   downloadBlob,
   downloadText,
@@ -598,4 +599,6 @@ class App {
   }
 }
 
-new App();
+// Phones and tablets get the gate in index.html instead — no WebGL context is
+// created there, so nothing spins up that the device can't drive.
+bootWhenSupported(() => new App());

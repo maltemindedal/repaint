@@ -45,6 +45,9 @@ body {
   font-family: var(--font);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  /* Mobile font boosting would resize the gate's text unevenly (see below). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 button,
@@ -915,4 +918,151 @@ input[type='checkbox'] {
   --background-color: rgba(20, 20, 20, 0.92);
   --width: 300px;
   z-index: 40;
+}
+
+/* ------------------------------------------------------------- mobile gate */
+/*
+ * Touch-only devices get the gate instead of the app. Driven by the media
+ * query rather than JS so it is correct on first paint; `.app-unlocked` on
+ * <html> is the escape hatch the "Continue anyway" button sets.
+ * See src/ui/MobileGate.ts.
+ */
+
+#mobile-gate {
+  display: none;
+}
+
+@media (pointer: coarse) and (hover: none) {
+  #app {
+    display: none;
+  }
+
+  #mobile-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+    background: var(--g-900);
+    padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+}
+
+html.app-unlocked #app {
+  display: flex;
+}
+
+html.app-unlocked #mobile-gate {
+  display: none;
+}
+
+.gate-card {
+  width: 100%;
+  max-width: 400px;
+  margin: auto;
+}
+
+.gate-icon {
+  width: 60px;
+  height: 40px;
+  margin-bottom: 22px;
+  fill: none;
+  stroke: var(--g-500);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gate-card h1 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--g-100);
+}
+
+.gate-lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--g-300);
+}
+
+.gate-list {
+  margin: 22px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--g-700);
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--g-400);
+}
+
+/* Hand-drawn marker rather than a grid column: the `<code>` inside one of the
+ * items would otherwise become a grid item of its own and break the line. */
+.gate-list li {
+  position: relative;
+  padding-left: 18px;
+}
+
+.gate-list li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--g-600);
+}
+
+.gate-list code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  color: var(--g-300);
+}
+
+.gate-foot {
+  margin: 24px 0 0;
+  font-size: 13px;
+  color: var(--g-500);
+}
+
+.gate-url {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: var(--g-850);
+  border: 1px solid var(--g-700);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--g-100);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.gate-url:empty {
+  display: none;
+}
+
+.gate-continue {
+  margin-top: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--g-600);
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--g-500);
+  cursor: pointer;
+}
+
+.gate-continue:active {
+  color: var(--g-300);
 }

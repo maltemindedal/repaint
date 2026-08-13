@@ -45,6 +45,40 @@
       <aside id="sidebar"></aside>
     </div>
 
+    <!--
+      Shown instead of #app on touch-only devices. Kept in the HTML (rather than
+      built in TS) so it is already on screen at first paint — see the media
+      query in style.css and src/ui/MobileGate.ts.
+    -->
+    <div id="mobile-gate">
+      <div class="gate-card">
+        <svg class="gate-icon" viewBox="0 0 48 32" aria-hidden="true">
+          <rect x="1" y="1" width="34" height="24" rx="2.5" />
+          <path d="M12 31h12M18 25v6" />
+          <rect x="38" y="9" width="9" height="16" rx="2" />
+          <path d="M41 22h3" />
+        </svg>
+
+        <h1>Repaint works on a desktop</h1>
+        <p class="gate-lede">
+          This is a 3D editor, and it is built around a mouse and a keyboard. There is no phone
+          version — open it on a laptop or desktop instead.
+        </p>
+
+        <ul class="gate-list">
+          <li>Hover and click to pick the wall you want to paint</li>
+          <li>WASD and drag-to-look to walk through the apartment</li>
+          <li>A 340px sidebar for colours, schemes and materials</li>
+          <li>Drag a Blender <code>.glb</code> onto the window to load it</li>
+        </ul>
+
+        <p class="gate-foot">Open this address on a computer:</p>
+        <div id="gate-url" class="gate-url"></div>
+
+        <button id="gate-continue" class="gate-continue" type="button">Continue anyway</button>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

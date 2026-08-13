@@ -440,6 +440,8 @@ src/
     storage.ts             localStorage + memory fallback; validating migration
   ui/                      Sidebar, ColorPicker, Toolbar, DropZone, DebugPanel,
                            HelpOverlay, StatusPanel (toasts/loading), swatches
+    MobileGate.ts          Touch-only devices get the "use a desktop" page in
+                           index.html instead of a booted app
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
