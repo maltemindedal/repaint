@@ -264,6 +264,17 @@ export class WalkControls {
     }
   }
 
+  /**
+   * Declares the current pose already persisted, so the settle timer stops
+   * holding movement it no longer owes anyone. The mode switch banks the pose
+   * on the way out; without this the two "needs saving" trackers disagree.
+   */
+  markPoseSaved(): void {
+    this.poseDirty = false;
+    this.quietFor = 0;
+    this.recordPose();
+  }
+
   private recordPose(): void {
     const last = this.lastEmitted;
     last.x = this.position.x;

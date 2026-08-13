@@ -446,6 +446,7 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
+  navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -459,6 +460,15 @@ npm test
 It builds the procedural room, runs discovery against it, and checks the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
+
+`navigation.test.ts` covers the one part of `nav/` that is reachable without a
+renderer: `NavigationController` reads only `viewer.camera` and `viewer.canvas`,
+so the orbit ⇄ walk hand-off can be stepped frame by frame in node. It does need
+listeners, so that file — and only that file — stands up a stub `window`,
+`document` and canvas on `globalThis` for the duration of each test. Deliberate:
+a jsdom dependency to satisfy a handful of `addEventListener` calls costs more
+than the stub does. Anything needing real layout or a GL context belongs in
+manual testing against a fixture instead.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

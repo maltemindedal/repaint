@@ -435,8 +435,11 @@ class App {
 
   private setMode(mode: NavMode): void {
     if (mode === this.nav.mode) return;
-    // Read the saved pose *before* switching: setMode emits the carried-over
-    // camera pose for the new mode, which would overwrite the stored one.
+    // Read the saved pose *before* switching. `setMode` emits twice: the
+    // outgoing mode's real pose first, then the carried-over camera pose for
+    // the incoming one — and that second emit overwrites the slot being read
+    // here. Reading first is what keeps it intact. (The carried-over emit is
+    // the defect issue #4 is about; it is still in place.)
     const saved = this.store.getPose(mode);
     this.nav.setMode(mode);
     if (saved) this.nav.applyPose(saved);

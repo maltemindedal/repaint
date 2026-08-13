@@ -59,6 +59,7 @@ export class NavigationController {
     // while `_mode` is still the outgoing one, so `getPose` reads the right
     // controller — persists it before the hand-off.
     this.emitPose();
+    if (this._mode === 'walk') this.walk.markPoseSaved();
 
     this._mode = mode;
 
