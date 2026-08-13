@@ -426,7 +426,7 @@ src/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
     SceneLoader.ts         GLB → LoadedScene, disposal, load report
     SceneSession.ts        Scene activation: prefs, discovery, picker, camera —
-                           the ordering lives here, so callers just load()
+                           the activation order lives here, not in the caller
     loaders.ts             GLTFLoader + DRACO / KTX2 / meshopt
     processScene.ts        Renderer-free: lightmap wiring, bounds, START_CAM, stats
     PaintRegistry.ts       Discovery + the single write path for material.color

@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: SceneSettings = {
   // 0 by default: the same baked texture drives lightMap, so also feeding it
   // into aoMap would multiply the occlusion in twice. Scenes whose occlusion is
   // ORM-packed (AO-only, no lightmap) get a per-scene default of 1 instead —
-  // see App.setScene. See README.
+  // see SceneSession.applyHeuristicDefaults. See README.
   aoMapIntensity: 0.0,
   envIntensity: 0.25,
   punctualLights: false,

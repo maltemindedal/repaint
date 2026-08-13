@@ -49,9 +49,10 @@ export class PaintRegistry {
   /**
    * Rebuilds from a scene graph. Safe to call again after re-tagging.
    *
-   * Every target comes back on its exported colour: what was on screen is the
-   * store's business, and `SceneSession` repaints from there. One restore
-   * mechanism, not two.
+   * Reads colour, never writes it: a target comes back on whatever the graph
+   * currently says, both `originalHex` and `currentHex`. Restoring what was on
+   * screen is the store's business, and `SceneSession` repaints from there —
+   * one restore mechanism, not two.
    */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);

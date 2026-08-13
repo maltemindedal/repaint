@@ -22,7 +22,7 @@ export interface SessionCamera {
 
 /** What activation needs from the picker — `Picker` satisfies this. */
 export interface SessionPicker {
-  setScene(root: Object3D | null): void;
+  setScene(root: Object3D): void;
   refreshTargets(): void;
 }
 
@@ -136,8 +136,9 @@ export class SceneSession {
 
   /**
    * Rebuilds the paint targets and repaints them from the store — the single
-   * record of what was on screen. Discovery itself hands back the exported
-   * colours, deliberately: one restore mechanism, not two.
+   * record of what was on screen. Discovery deliberately restores nothing of
+   * its own: it reports the graph as it finds it, and everything the user
+   * chose comes back through here.
    */
   private discoverTargets(): void {
     const { registry, store } = this.deps;
