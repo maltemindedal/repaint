@@ -447,7 +447,7 @@ scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
-  paint-controller.test.ts   9 tests over the paint fan-out, with a fake store
+  paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -456,11 +456,11 @@ store (what survives a reload), the sidebar and the toolbar. `PaintController`
 owns that fan-out so no _edit_ can do half of it: it writes the registry and
 the store, then emits one change carrying the targets that actually moved and,
 only when they went stale, the scheme rows to re-render. `main.ts` subscribes
-once and updates the views from there. (Restoring saved colours after a load
+once and updates both views from there. (Restoring saved colours after a load
 goes straight to the registry — it is _reading_ the store, so it has nothing to
-write back.) That "only when stale" is what keeps a
-picker drag cheap — it fires a paint per pointermove, and rebuilding the toolbar
-scheme slots each time would undo the targeted row update the sidebar does.
+write back.) That "only when stale" is what keeps a picker drag cheap: it fires
+a paint per pointermove, and rebuilding the toolbar scheme slots each time would
+undo the targeted row update the sidebar does.
 
 `processScene.ts`, `PaintRegistry.ts` and `PaintController.ts` deliberately need
 no renderer, which is what lets the tests run the real pipeline headlessly in
@@ -474,7 +474,9 @@ They build the procedural room, run discovery against it, and check the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised. The
 fan-out is covered against a fake store: which walls each operation reports, and
-that the scheme rows re-render exactly when the slots change and not once more.
+that the scheme rows are asked to re-render exactly when the slots change and
+not once more. Whether `main.ts` then draws both views is browser-side and not
+covered here — the sidebar/toolbar seam is the next thing worth deepening.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

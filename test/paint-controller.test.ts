@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createFallbackScene } from '../src/core/fallbackScene.ts';
 import { PaintRegistry } from '../src/core/PaintRegistry.ts';
 import { PaintController, type PaintChange, type PaintStore } from '../src/core/PaintController.ts';
-import type { Scheme, SchemeView } from '../src/types.ts';
+import type { Scheme } from '../src/types.ts';
 
 /**
  * The paint fan-out, exercised headlessly: a real PaintRegistry over the
@@ -37,24 +37,13 @@ class FakeStore implements PaintStore {
   }
 }
 
-/** Stands in for a view that draws the scheme slots, recording its re-renders. */
-class FakeSchemeRows {
-  renders: SchemeView[] = [];
-
-  constructor(paint: PaintController) {
-    paint.onChange((change) => {
-      if (change.schemes) this.renders.push(change.schemes);
-    });
-  }
-}
-
 function setup() {
   const registry = new PaintRegistry();
   registry.discover(createFallbackScene());
   const store = new FakeStore();
   const paint = new PaintController(registry, store);
   const changes: PaintChange[] = [];
-  paint.onChange((change) => changes.push(change));
+  paint.onPaintChanged = (change) => changes.push(change);
   return { registry, store, paint, changes };
 }
 
@@ -63,7 +52,7 @@ describe('paint fan-out', () => {
     const { registry, store, paint, changes } = setup();
 
     // Not the wall's exported #e8e4da — a write has to actually move it.
-    expect(paint.apply('PAINT_Living_North', '#3a7fd5')).toBe(true);
+    expect(paint.apply('PAINT_Living_North', '#3a7fd5')?.key).toBe('PAINT_Living_North');
 
     expect(registry.get('PAINT_Living_North')?.currentHex).toBe('#3a7fd5');
     expect(store.current).toEqual({ PAINT_Living_North: '#3a7fd5' });
@@ -97,7 +86,7 @@ describe('paint fan-out', () => {
     store.activeSchemeId = 'slot-2';
     changes.length = 0;
 
-    expect(paint.reset('PAINT_Living_East')).toBe(true);
+    expect(paint.reset('PAINT_Living_East')?.currentHex).toBe(original);
 
     expect(registry.get('PAINT_Living_East')?.currentHex).toBe(original);
     expect(store.current).toEqual({});
@@ -131,26 +120,11 @@ describe('paint fan-out', () => {
     paint.apply('PAINT_Living_North', '#aabbcc');
     changes.length = 0;
 
-    expect(paint.apply('PAINT_Nonexistent', '#aabbcc')).toBe(false);
-    expect(paint.apply('PAINT_Living_North', '#aabbcc')).toBe(true);
-    expect(paint.reset('PAINT_Ceiling')).toBe(true);
+    expect(paint.apply('PAINT_Nonexistent', '#aabbcc')).toBeNull();
+    expect(paint.apply('PAINT_Living_North', '#aabbcc')).not.toBeNull();
+    expect(paint.reset('PAINT_Ceiling')).not.toBeNull();
 
     expect(changes).toEqual([]);
-  });
-
-  it('re-renders both scheme views together, so neither is left highlighted', () => {
-    const { store, paint } = setup();
-    // The sidebar and the toolbar both draw the scheme slots; the bug this
-    // guards is one of them updating while the other keeps its highlight.
-    const sidebar = new FakeSchemeRows(paint);
-    const toolbar = new FakeSchemeRows(paint);
-    store.activeSchemeId = 'slot-1';
-
-    paint.apply('PAINT_Living_North', '#3a7fd5');
-    paint.apply('PAINT_Living_North', '#111111');
-
-    expect(sidebar.renders).toEqual([{ schemes: store.schemes, activeId: null }]);
-    expect(toolbar.renders).toEqual(sidebar.renders);
   });
 });
 

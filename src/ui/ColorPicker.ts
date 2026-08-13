@@ -161,11 +161,12 @@ export class ColorPicker {
     this.sync();
   }
 
-  /** A colour chosen *inside* the picker — shows it, then asks for it. */
+  /** A colour chosen *inside* the picker — applies it and tells the app. */
   private pick(hex: string): void {
-    if (!normalizeHex(hex)) return;
-    this.showHex(hex);
-    this.options.onChange(this.currentHex());
+    const parsed = normalizeHex(hex);
+    if (!parsed) return;
+    this.hsv = hexToHsv(parsed);
+    this.sync(true);
   }
 
   private sync(notify = false, keepInput = false): void {

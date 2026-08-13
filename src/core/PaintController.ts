@@ -7,28 +7,8 @@
  * writes live here, and views learn about them from a single change event.
  */
 
-import type { Scheme, SchemeView } from '../types.ts';
-
-/** What the controller reads off a paint target; `PaintTarget` is a superset. */
-interface PaintedTarget {
-  key: string;
-  currentHex: string;
-}
-
-/**
- * The slice of `PaintRegistry` the controller drives. Targets are mutated in
- * place, so a handle read before a write reports the new colour after it, and
- * `get` decides which keys exist — a write to one it returned always lands.
- */
-export interface PaintModel {
-  get(key: string): PaintedTarget | undefined;
-  list(): PaintedTarget[];
-  setColor(key: string, hex: string): boolean;
-  resetColor(key: string): boolean;
-  resetAll(): void;
-  applyScheme(colors: Record<string, string>): number;
-  capture(): Record<string, string>;
-}
+import type { PaintRegistry } from './PaintRegistry.ts';
+import type { PaintTarget, Scheme, SchemeView } from '../types.ts';
 
 /** The slice of `AppStore` the controller writes through. */
 export interface PaintStore {
@@ -57,61 +37,56 @@ export type ApplySchemeResult =
   | { outcome: 'applied'; scheme: Scheme; applied: number; requested: number };
 
 export class PaintController {
-  private listeners = new Set<PaintListener>();
+  onPaintChanged: PaintListener | null = null;
 
   constructor(
-    private model: PaintModel,
+    private registry: PaintRegistry,
     private store: PaintStore,
   ) {}
 
-  /** Subscribe to every paint change. Each listener sees the same payload. */
-  onChange(listener: PaintListener): void {
-    this.listeners.add(listener);
-  }
-
-  /** Paints one target. False when the scene has no such target. */
-  apply(key: string, hex: string): boolean {
-    const target = this.model.get(key);
-    if (!target) return false;
+  /** Paints one target. Null when the scene has no such target. */
+  apply(key: string, hex: string): PaintTarget | null {
+    const target = this.registry.get(key);
+    if (!target) return null;
     const before = target.currentHex;
-    this.model.setColor(key, hex);
+    this.registry.setColor(key, hex);
     this.store.setCurrentColor(key, target.currentHex);
     // Hand-painting a wall means the scene no longer *is* the saved scheme.
     this.emit(moved(target, before), this.selectScheme(null));
-    return true;
+    return target;
   }
 
   /** Puts one target back to the colour the GLB shipped with. */
-  reset(key: string): boolean {
-    const target = this.model.get(key);
-    if (!target) return false;
+  reset(key: string): PaintTarget | null {
+    const target = this.registry.get(key);
+    if (!target) return null;
     const before = target.currentHex;
-    this.model.resetColor(key);
+    this.registry.resetColor(key);
     this.store.clearCurrentColor(key);
     this.emit(moved(target, before), this.selectScheme(null));
-    return true;
+    return target;
   }
 
   /** Puts the whole scene back to its exported colours. */
   resetAll(): void {
     const before = this.snapshot();
-    this.model.resetAll();
-    for (const target of this.model.list()) this.store.clearCurrentColor(target.key);
+    this.registry.resetAll();
+    for (const target of this.registry.list()) this.store.clearCurrentColor(target.key);
     this.emit(this.changedSince(before), this.selectScheme(null));
   }
 
   /** Paints a saved slot over the scene. Keys the scene lacks are counted, not applied. */
   applyScheme(id: string): ApplySchemeResult {
-    const scheme = this.store.schemes.find((s) => s.id === id);
+    const scheme = this.scheme(id);
     if (!scheme) return { outcome: 'missing' };
     const requested = Object.keys(scheme.colors).length;
     if (requested === 0) return { outcome: 'empty', scheme };
 
     const before = this.snapshot();
-    const applied = this.model.applyScheme(scheme.colors);
+    const applied = this.registry.applyScheme(scheme.colors);
     // Persist the whole scene, not just the slot's keys: what you see now is
     // what a reload has to bring back.
-    for (const target of this.model.list()) {
+    for (const target of this.registry.list()) {
       this.store.setCurrentColor(target.key, target.currentHex);
     }
     this.emit(this.changedSince(before), this.selectScheme(id));
@@ -120,13 +95,17 @@ export class PaintController {
 
   /** Stores the scene's current colours into a slot. Null when there's no such slot. */
   capture(id: string): Scheme | null {
-    const scheme = this.store.schemes.find((s) => s.id === id);
+    const scheme = this.scheme(id);
     if (!scheme) return null;
-    this.store.saveScheme(id, this.model.capture());
+    this.store.saveScheme(id, this.registry.capture());
     this.selectScheme(id);
     // Nothing on the walls moved, but the slot's swatches just did.
     this.emit(new Map(), true);
     return scheme;
+  }
+
+  private scheme(id: string): Scheme | null {
+    return this.store.schemes.find((s) => s.id === id) ?? null;
   }
 
   /** Moves the active slot. False when it was already there — nothing to re-render. */
@@ -138,12 +117,12 @@ export class PaintController {
 
   /** Colours as they stand now — strings, so it survives the writes that follow. */
   private snapshot(): Map<string, string> {
-    return new Map(this.model.list().map((target) => [target.key, target.currentHex]));
+    return new Map(this.registry.list().map((target) => [target.key, target.currentHex]));
   }
 
   private changedSince(before: Map<string, string>): Map<string, string> {
     const changed = new Map<string, string>();
-    for (const target of this.model.list()) {
+    for (const target of this.registry.list()) {
       if (before.get(target.key) !== target.currentHex) changed.set(target.key, target.currentHex);
     }
     return changed;
@@ -157,11 +136,11 @@ export class PaintController {
         ? { schemes: this.store.schemes, activeId: this.store.activeSchemeId }
         : null,
     };
-    for (const listener of this.listeners) listener(change);
+    this.onPaintChanged?.(change);
   }
 }
 
 /** One-target change set, empty when the write landed on the colour already there. */
-function moved(target: PaintedTarget, before: string): Map<string, string> {
+function moved(target: PaintTarget, before: string): Map<string, string> {
   return before === target.currentHex ? new Map() : new Map([[target.key, target.currentHex]]);
 }

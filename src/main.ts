@@ -54,9 +54,7 @@ class App {
 
     this.sidebar = new Sidebar(requireElement('sidebar'), {
       onSelect: (key) => this.select(key),
-      onColorChange: (key, hex) => {
-        this.paint.apply(key, hex);
-      },
+      onColorChange: (key, hex) => this.paint.apply(key, hex),
       onResetTarget: (key) => this.resetTarget(key),
       onResetAll: () => this.resetAll(),
       onTagChange: (name, tagged) => this.setTag(name, tagged),
@@ -94,7 +92,7 @@ class App {
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
-    this.paint.onChange((change) => this.onPaintChanged(change));
+    this.paint.onPaintChanged = (change) => this.renderPaintChange(change);
 
     this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
@@ -251,7 +249,7 @@ class App {
    * drag, library click, scheme, reset — arrives here, so no call site can
    * update half the UI and leave the other half stale.
    */
-  private onPaintChanged(change: PaintChange): void {
+  private renderPaintChange(change: PaintChange): void {
     for (const [key, hex] of change.colors) this.sidebar.updateTarget(key, hex);
 
     const selectedHex = this.selectedKey ? change.colors.get(this.selectedKey) : undefined;
@@ -263,8 +261,8 @@ class App {
   }
 
   private resetTarget(key: string): void {
-    const target = this.registry.get(key);
-    if (!target || !this.paint.reset(key)) return;
+    const target = this.paint.reset(key);
+    if (!target) return;
     this.panel.status(
       `${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`,
     );
