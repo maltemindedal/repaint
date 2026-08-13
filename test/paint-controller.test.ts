@@ -81,17 +81,17 @@ describe('paint fan-out', () => {
 
   it('resets one wall to its exported colour and forgets the saved override', () => {
     const { registry, store, paint, changes } = setup();
-    const exported = registry.get('PAINT_Living_East')?.exportedHex;
+    const original = registry.get('PAINT_Living_East')?.originalHex;
     paint.apply('PAINT_Living_East', '#ff0000');
     store.activeSchemeId = 'slot-2';
     changes.length = 0;
 
-    expect(paint.reset('PAINT_Living_East')?.currentHex).toBe(exported);
+    expect(paint.reset('PAINT_Living_East')?.currentHex).toBe(original);
 
-    expect(registry.get('PAINT_Living_East')?.currentHex).toBe(exported);
+    expect(registry.get('PAINT_Living_East')?.currentHex).toBe(original);
     expect(store.current).toEqual({});
     expect(changes).toHaveLength(1);
-    expect([...changes[0].colors]).toEqual([['PAINT_Living_East', exported]]);
+    expect([...changes[0].colors]).toEqual([['PAINT_Living_East', original]]);
     // Undoing one wall deviates from the saved scheme exactly as painting it does.
     expect(store.activeSchemeId).toBeNull();
   });
@@ -112,7 +112,7 @@ describe('paint fan-out', () => {
       'PAINT_Ceiling',
       'PAINT_Living_North',
     ]);
-    expect(changes[0].colors.get('PAINT_Ceiling')).toBe(registry.get('PAINT_Ceiling')?.exportedHex);
+    expect(changes[0].colors.get('PAINT_Ceiling')).toBe(registry.get('PAINT_Ceiling')?.originalHex);
   });
 
   it('says nothing when a write moves nothing', () => {

@@ -290,7 +290,7 @@ describe('colour restore', () => {
     const { registry, session, store } = makeHarness();
     const scene = makeScene();
     session.load(scene);
-    const exported = registry.get('PAINT_Living_North')!.exportedHex;
+    const exported = registry.get('PAINT_Living_North')!.originalHex;
 
     registry.setColor('PAINT_Living_North', '#abcdef');
     store.setCurrentColor('PAINT_Living_North', '#abcdef');
@@ -299,7 +299,7 @@ describe('colour restore', () => {
 
     // Guards the reported bug: re-discovery reading the exported colour off
     // materials that by now wear the user's paint, so R "resets" to the paint.
-    expect(registry.get('PAINT_Living_North')!.exportedHex).toBe(exported);
+    expect(registry.get('PAINT_Living_North')!.originalHex).toBe(exported);
     registry.resetColor('PAINT_Living_North');
     expect(registry.get('PAINT_Living_North')!.currentHex).toBe(exported);
   });

@@ -58,10 +58,16 @@ export class PaintRegistry {
    * colour is no longer a usable source. Dropped when the root changes, since a
    * new load brings its own materials.
    */
-  private exportedHex = new Map<string, string>();
+  private originalHexes = new Map<string, string>();
   /** The graph we last discovered. A different one means a fresh load. */
   private root: Object3D | null = null;
   private scratch = new Color();
+
+  // Both sorted views cost an Intl collation per comparison, and both change
+  // only when `discover` runs — but they are read on every sidebar render, so
+  // they are built once per discovery instead.
+  private sortedTargets: PaintTarget[] | null = null;
+  private sortedMaterials: MaterialInfo[] | null = null;
 
   /**
    * Rebuilds from a scene graph. Safe to call again after re-tagging.
@@ -70,9 +76,9 @@ export class PaintRegistry {
    * graph currently says. Putting back what was on screen belongs to
    * `SceneSession.discoverTargets`.
    *
-   * `exportedHex` is the one thing the graph can no longer answer for on a
+   * `originalHex` is the one thing the graph can no longer answer for on a
    * re-discovery — by then the materials wear the user's paint — so it comes
-   * from `this.exportedHex`, banked on the way past below.
+   * from `this.originalHexes`, banked on the way past below.
    */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
@@ -80,9 +86,11 @@ export class PaintRegistry {
 
     if (root !== this.root) {
       this.root = root;
-      this.exportedHex.clear();
+      this.originalHexes.clear();
     }
 
+    this.sortedTargets = null;
+    this.sortedMaterials = null;
     this.groups.clear();
     root.traverse((obj) => {
       const mesh = obj as Mesh;
@@ -97,7 +105,7 @@ export class PaintRegistry {
           // still pristine — and for every material, paintable or not: an
           // untagged one keeps whatever paint it was wearing, so its exported
           // colour has to be on record before it can be tagged again.
-          if (!this.exportedHex.has(mat.name)) this.exportedHex.set(mat.name, hexOf(mat.color));
+          if (!this.originalHexes.has(mat.name)) this.originalHexes.set(mat.name, hexOf(mat.color));
         }
         if (!group.materials.includes(mat)) group.materials.push(mat);
         if (!group.meshes.includes(mesh)) group.meshes.push(mesh);
@@ -119,7 +127,7 @@ export class PaintRegistry {
         displayName: displayNameFor(group.name),
         materials: group.materials,
         meshes: group.meshes,
-        exportedHex: this.exportedHex.get(group.name) ?? live,
+        originalHex: this.originalHexes.get(group.name) ?? live,
         currentHex: live,
         auto,
       };
@@ -128,10 +136,16 @@ export class PaintRegistry {
     }
   }
 
+  /**
+   * The targets, display-name order. The array is shared and must be treated
+   * as read-only; the `PaintTarget`s in it are the live ones this registry
+   * mutates, so `currentHex` is always up to date.
+   */
   list(): PaintTarget[] {
-    return [...this.targets.values()].toSorted((a, b) =>
+    this.sortedTargets ??= [...this.targets.values()].toSorted((a, b) =>
       a.displayName.localeCompare(b.displayName, undefined, { numeric: true }),
     );
+    return this.sortedTargets;
   }
 
   get(key: string): PaintTarget | undefined {
@@ -142,9 +156,9 @@ export class PaintRegistry {
     return this.targets.size;
   }
 
-  /** Every material in the scene, for the manual-tagging list. */
+  /** Every material in the scene, for the manual-tagging list. Read-only. */
   allMaterials(): MaterialInfo[] {
-    return [...this.groups.values()]
+    this.sortedMaterials ??= [...this.groups.values()]
       .map((group) => ({
         name: group.name,
         isPaintable: this.targets.has(group.name),
@@ -153,6 +167,7 @@ export class PaintRegistry {
         meshCount: group.meshes.length,
       }))
       .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    return this.sortedMaterials;
   }
 
   /** Resolves a raycast hit back to the target that owns it. */
@@ -189,7 +204,7 @@ export class PaintRegistry {
   resetColor(key: string): boolean {
     const target = this.targets.get(key);
     if (!target) return false;
-    return this.setColor(key, target.exportedHex);
+    return this.setColor(key, target.originalHex);
   }
 
   resetAll(): void {

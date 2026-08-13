@@ -415,13 +415,27 @@ scene's geometry/texture/compression numbers.
 
 Vanilla three.js, not React Three Fiber. For a single-canvas tool with one imperative
 scene graph, R3F's reconciler adds a React dependency and a mental indirection layer
-without buying anything: there are no lists of components to diff, and the hot path
-(a colour write during a picker drag) wants to bypass a render loop, not go through
-one. The UI is small enough that plain DOM is less code than the React it'd replace.
+without buying anything: the hot path — a colour write during a picker drag — is a
+uniform upload straight to `material.color`, and it stays that way whatever the panels
+around it do. The UI is small enough that plain DOM is less code than the React it'd
+replace.
+
+The panels do diff, though, because they have to. `Sidebar` takes its whole state as
+one view model and works out what moved (`src/ui/Sidebar.ts`), and `Toolbar` skips a
+slot rebuild when the schemes are unchanged. That is deliberate and about 60 lines,
+not a reconciler: it exists so the app can re-render both panels after _every_
+mutation — including on each pointermove of a drag — instead of each call site
+remembering which half of the UI it was supposed to touch. Two rules keep it cheap:
+`PaintRegistry.list()` / `allMaterials()` are sorted once per discovery rather than
+per render (the sort is an Intl collation, and it was the whole cost), and a section
+is compared against a snapshot of its own contents, since the store mutates the
+objects it hands out in place.
 
 ```
 src/
   main.ts                  App — wiring, shortcuts, persistence, screenshots
+  sidebarViewModel.ts      Gathers what the sidebar should be showing into one
+                           plain object; no DOM, so it is directly assertable
   types.ts                 Shared types; PAINT_ prefix and START_CAM name live here
   core/
     Viewer.ts              Renderer, camera, frame loop, environment, tone mapping
@@ -447,16 +461,20 @@ src/
     storage.ts             localStorage + memory fallback; validating migration
   ui/                      Sidebar, ColorPicker, Toolbar, DropZone, DebugPanel,
                            HelpOverlay, StatusPanel (toasts/loading), swatches
+    Sidebar.ts             One `render(viewModel)`; diffs internally so it can
+                           be re-rendered on every pointermove of a colour drag
     MobileGate.ts          Touch-only devices get the "use a desktop" page in
                            index.html instead of a booted app
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
-  smoke.test.ts            25 tests over the fallback scene
+  smoke.test.ts            26 tests over the fallback scene
   navigation.test.ts       Orbit ⇄ walk hand-off, against a stub DOM
   sceneSession.test.ts     17 tests pinning the scene-activation order
   paint-controller.test.ts   8 tests over the paint fan-out, with a fake store
   walk-motion.test.ts        12 tests pinning eye-height ownership
+  viewModel.test.ts        6 tests over the sidebar view model — no DOM
+  sidebar.test.ts          16 tests over the sidebar's rendering and diffing
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -490,6 +508,18 @@ settings, discovery before the picker, bounds before the pose, settings last —
 fails loudly if anyone reshuffles it. Whether `main.ts` then draws both views is
 browser-side and not covered here — the sidebar/toolbar seam is the next thing
 worth deepening.
+
+The sidebar splits the same way, which is why it takes a view model at all.
+`sidebarViewModel.ts` answers "what should the panel be showing?" as a plain
+object, and `viewModel.test.ts` asserts that in plain node — including that
+nothing from three.js leaks in, and that paint rows are _snapshots_ rather than
+the registry's live targets (which it mutates in place, so handing them over
+would leave the panel diffing a value against itself).
+
+Only the drawing half needs a document. `sidebar.test.ts` runs against happy-dom
+via a `@vitest-environment` docblock, so the rest of the suite stays in plain
+node, and covers which sections a render rebuilds, which it leaves standing, and
+what survives an open colour picker.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):

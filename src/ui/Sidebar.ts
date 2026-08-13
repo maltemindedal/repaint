@@ -1,7 +1,7 @@
 import { el, clear } from '../util/dom.ts';
 import { ColorPicker } from './ColorPicker.ts';
 import { miniSwatches } from './swatches.ts';
-import type { LibraryColor, MaterialInfo, PaintTarget, SchemeView } from '../types.ts';
+import type { LibraryColor, MaterialInfo, SchemeView } from '../types.ts';
 
 export interface SidebarCallbacks {
   onSelect: (key: string | null) => void;
@@ -22,19 +22,59 @@ export interface SidebarCallbacks {
   onScreenshot: () => void;
 }
 
+/**
+ * One row of the paint list.
+ *
+ * Plain data, never a live `PaintTarget`: the registry mutates those in place,
+ * so a sidebar holding on to one would be comparing an object against itself
+ * and would never see a colour change. Rebuilt per render by the caller.
+ */
+export interface PaintRow {
+  key: string;
+  displayName: string;
+  originalHex: string;
+  currentHex: string;
+}
+
+/** Everything the sidebar draws. Built by `sidebarViewModel()`. */
+export interface SidebarViewModel {
+  fileLabel: string;
+  targets: PaintRow[];
+  materials: MaterialInfo[];
+  library: LibraryColor[];
+  /** Slots and which one is live — the same view the toolbar renders from. */
+  schemes: SchemeView;
+  selectedKey: string | null;
+  hoveredKey: string | null;
+}
+
+/** The sections `render` rebuilds wholesale rather than patching field by field. */
+type Section = 'schemes' | 'library' | 'materials';
+
 interface RowRefs {
   row: HTMLElement;
   swatch: HTMLElement;
+  name: HTMLElement;
   hex: HTMLElement;
+  reset: HTMLButtonElement;
   holder: HTMLElement;
+  /** What this row was last drawn from, to diff the next view model against. */
+  data: PaintRow;
 }
 
 /**
  * The right-hand panel: paintable walls, manual material tagging, the colour
  * library, scheme slots and data import/export.
  *
- * Colour edits update only the affected row rather than re-rendering the tree —
- * a full rebuild mid-drag would tear the open picker out from under the pointer.
+ * One entry point — `render(viewModel)`. It diffs the model against what is on
+ * screen and touches only what moved, so it is cheap enough for every
+ * pointermove of a colour drag: a changed colour rewrites two nodes instead of
+ * rebuilding the tree and tearing the open picker out from under the pointer.
+ *
+ * Data flows one way. The sidebar never writes model state — not even the row
+ * whose picker the user is dragging. It reports through the callbacks and
+ * redraws when the app renders the change back, so no call site has to know
+ * which half of an update is already done.
  */
 export class Sidebar {
   private root: HTMLElement;
@@ -49,11 +89,23 @@ export class Sidebar {
   private schemesBody = el('div', { class: 'sb-section-body' });
 
   private rows = new Map<string, RowRefs>();
-  private targets: PaintTarget[] = [];
-  private library: LibraryColor[] = [];
-  private picker: ColorPicker | null = null;
-  private selectedKey: string | null = null;
+  /** Row order on screen; null until the first render. */
+  private order: string[] | null = null;
+  private libraryInputs = new Map<string, HTMLInputElement>();
+  private schemeInputs = new Map<string, HTMLInputElement>();
   private pendingLibraryFocus: string | null = null;
+
+  private picker: ColorPicker | null = null;
+  private pickerKey: string | null = null;
+  /** The hex the picker is showing, so a render doesn't fight an active drag. */
+  private pickerHex: string | null = null;
+
+  private library: LibraryColor[] = [];
+  private selectedKey: string | null = null;
+  private hoveredKey: string | null = null;
+
+  private renderedLabel: string | null = null;
+  private snapshots = new Map<Section, string>();
 
   constructor(
     container: HTMLElement,
@@ -93,6 +145,34 @@ export class Sidebar {
     this.root.append(head, this.body);
   }
 
+  /**
+   * Draw the panel. Idempotent: rendering the same view model twice is a
+   * handful of string comparisons and no DOM work at all.
+   */
+  render(vm: SidebarViewModel): void {
+    // Held for the picker, which is built and refreshed from several passes below.
+    this.library = vm.library;
+
+    this.syncFileLabel(vm.fileLabel);
+    const rebuilt = this.syncPaintRows(vm.targets);
+    this.syncSelection(vm.selectedKey, rebuilt);
+    this.syncHover(vm.hoveredKey);
+    this.syncPickerHex(vm.targets);
+    this.syncSchemes(vm.schemes);
+    this.syncLibrary(vm.library);
+    this.syncMaterials(vm.materials);
+  }
+
+  /**
+   * Focus the name field of a freshly saved colour, so you can type its name.
+   * Order-independent: if the entry isn't drawn yet, the render that draws it
+   * takes the focus instead.
+   */
+  focusLibraryEntry(id: string): void {
+    this.pendingLibraryFocus = id;
+    this.applyLibraryFocus();
+  }
+
   // ------------------------------------------------------------- sections
 
   private dataSection(): HTMLElement {
@@ -113,18 +193,66 @@ export class Sidebar {
     return section('Data', body, undefined, true);
   }
 
-  setFileLabel(label: string): void {
+  /**
+   * True when a wholesale-rebuilt section has actually moved.
+   *
+   * The store hands back the same objects on every render and mutates them in
+   * place — renaming a scheme edits the very object the last render saw — so a
+   * section can only be diffed against a snapshot of its own contents, never
+   * against the reference it was handed last time. Names are deliberately left
+   * out of the snapshot and written in place instead: they are the one field
+   * the user edits directly, and rebuilding around a live caret would drop
+   * them out of the field they are typing in.
+   */
+  private moved(name: Section, contents: unknown): boolean {
+    const snapshot = JSON.stringify(contents);
+    if (this.snapshots.get(name) === snapshot) return false;
+    this.snapshots.set(name, snapshot);
+    return true;
+  }
+
+  private syncFileLabel(label: string): void {
+    if (label === this.renderedLabel) return;
+    this.renderedLabel = label;
     this.fileLabel.textContent = label;
     this.fileLabel.title = label;
   }
 
   // ----------------------------------------------------------- paint list
 
-  renderPaintTargets(targets: PaintTarget[], library: LibraryColor[]): void {
-    this.targets = targets;
-    this.library = library;
+  /** Returns true when the rows were rebuilt, i.e. every ref is now fresh. */
+  private syncPaintRows(targets: PaintRow[]): boolean {
+    if (this.order && sameKeys(this.order, targets)) {
+      for (const target of targets) this.updateRow(target);
+      return false;
+    }
+    this.buildPaintRows(targets);
+    return true;
+  }
+
+  private updateRow(next: PaintRow): void {
+    const refs = this.rows.get(next.key);
+    if (!refs) return;
+    const previous = refs.data;
+    refs.data = next;
+
+    if (previous.currentHex !== next.currentHex) {
+      refs.swatch.style.background = next.currentHex;
+      refs.hex.textContent = next.currentHex;
+    }
+    if (previous.displayName !== next.displayName) refs.name.textContent = next.displayName;
+    if (previous.originalHex !== next.originalHex) refs.reset.title = resetTitle(next.originalHex);
+  }
+
+  private buildPaintRows(targets: PaintRow[]): void {
+    this.closePicker();
     this.rows.clear();
-    this.picker = null;
+    this.order = targets.map((target) => target.key);
+    // Nothing in the fresh DOM carries these yet; the passes after this one
+    // put them back.
+    this.selectedKey = null;
+    this.hoveredKey = null;
+
     clear(this.paintBody);
     this.paintCount.textContent = String(targets.length);
 
@@ -142,26 +270,24 @@ export class Sidebar {
 
     for (const target of targets) {
       const swatch = el('div', { class: 'swatch', style: `background:${target.currentHex}` });
+      const name = el('div', { class: 'paint-name', text: target.displayName, title: target.key });
       const hex = el('div', { class: 'paint-sub', text: target.currentHex });
       const holder = el('div');
 
+      const reset = el('button', {
+        class: 'btn ghost',
+        text: '↺',
+        title: resetTitle(target.originalHex),
+        onclick: (event: Event) => {
+          event.stopPropagation();
+          this.cb.onResetTarget(target.key);
+        },
+      });
+
       const row = el('div', { class: 'paint-row', 'data-key': target.key }, [
         swatch,
-        el('div', { class: 'paint-meta' }, [
-          el('div', { class: 'paint-name', text: target.displayName, title: target.key }),
-          hex,
-        ]),
-        el('div', { class: 'actions' }, [
-          el('button', {
-            class: 'btn ghost',
-            text: '↺',
-            title: `Reset to exported colour (${target.exportedHex.toUpperCase()})`,
-            onclick: (event: Event) => {
-              event.stopPropagation();
-              this.cb.onResetTarget(target.key);
-            },
-          }),
-        ]),
+        el('div', { class: 'paint-meta' }, [name, hex]),
+        el('div', { class: 'actions' }, [reset]),
       ]);
 
       row.addEventListener('click', () => {
@@ -169,57 +295,49 @@ export class Sidebar {
       });
 
       this.paintBody.append(row, holder);
-      this.rows.set(target.key, { row, swatch, hex, holder });
-    }
-
-    if (this.selectedKey && this.rows.has(this.selectedKey)) {
-      this.openPicker(this.selectedKey, false);
+      this.rows.set(target.key, { row, swatch, name, hex, reset, holder, data: target });
     }
   }
 
-  /**
-   * Cheap targeted DOM update — safe to call on every pointermove of the
-   * picker. Deliberately does NOT touch `target.currentHex`: PaintRegistry is
-   * the sole writer of model state, and the rows hold the same PaintTarget
-   * references the registry mutates.
-   */
-  updateTarget(key: string, hex: string): void {
-    const refs = this.rows.get(key);
-    if (!refs) return;
-    refs.swatch.style.background = hex;
-    refs.hex.textContent = hex;
-  }
+  // ------------------------------------------------------- selection/hover
 
-  setSelected(key: string | null, scroll = true): void {
-    if (this.selectedKey === key) return;
+  private syncSelection(key: string | null, rebuilt: boolean): void {
+    if (key === this.selectedKey) return;
+
+    if (this.selectedKey) this.rows.get(this.selectedKey)?.row.classList.remove('selected');
     this.selectedKey = key;
-    for (const [rowKey, refs] of this.rows) {
-      refs.row.classList.toggle('selected', rowKey === key);
-      if (rowKey !== key) clear(refs.holder);
-    }
-    this.picker = null;
-    if (key) this.openPicker(key, scroll);
+    this.closePicker();
+
+    const refs = key ? this.rows.get(key) : undefined;
+    if (!refs) return;
+    refs.row.classList.add('selected');
+    // Scroll for a selection the user just made, not for one carried across a
+    // rebuild — that would yank the panel on every re-discovery.
+    this.openPicker(refs, !rebuilt);
   }
 
-  setHovered(key: string | null): void {
-    for (const [rowKey, refs] of this.rows) {
-      refs.row.classList.toggle('hovered-3d', rowKey === key);
-    }
+  private syncHover(key: string | null): void {
+    if (key === this.hoveredKey) return;
+    if (this.hoveredKey) this.rows.get(this.hoveredKey)?.row.classList.remove('hovered-3d');
+    this.hoveredKey = key;
+    if (key) this.rows.get(key)?.row.classList.add('hovered-3d');
   }
 
-  private openPicker(key: string, scroll: boolean): void {
-    const refs = this.rows.get(key);
-    const target = this.targets.find((t) => t.key === key);
-    if (!refs || !target) return;
-
-    clear(refs.holder);
+  private openPicker(refs: RowRefs, scroll: boolean): void {
+    const { key, currentHex, originalHex } = refs.data;
+    this.pickerKey = key;
+    this.pickerHex = currentHex;
     this.picker = new ColorPicker({
-      hex: target.currentHex,
-      exportedHex: target.exportedHex,
+      hex: currentHex,
+      originalHex,
       library: this.library,
-      // The row is updated by the paint change this reports, not from here —
-      // one writer, so a row can never show a colour the scene doesn't have.
-      onChange: (hex) => this.cb.onColorChange(key, hex),
+      // The row is redrawn by the render this change comes back as, not from
+      // here — one writer, so a row can never show a colour the scene doesn't
+      // have. Remembering the hex only keeps that render off an active drag.
+      onChange: (hex) => {
+        this.pickerHex = hex;
+        this.cb.onColorChange(key, hex);
+      },
       onSaveToLibrary: (hex) => this.cb.onSaveToLibrary(hex),
       onReset: () => this.cb.onResetTarget(key),
     });
@@ -227,14 +345,157 @@ export class Sidebar {
     if (scroll) refs.row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  /** Pushes an externally-applied colour (scheme switch, library click) into the open picker. */
-  syncPicker(hex: string): void {
-    this.picker?.showHex(hex);
+  private closePicker(): void {
+    if (this.pickerKey) {
+      const refs = this.rows.get(this.pickerKey);
+      if (refs) clear(refs.holder);
+    }
+    this.picker = null;
+    this.pickerKey = null;
+    this.pickerHex = null;
+  }
+
+  /**
+   * Push a colour the picker didn't produce — a scheme, a library click, a
+   * reset. Skipped when the hex is the one the picker last emitted, so a drag
+   * never has its own value round-tripped back through hex → HSV, which would
+   * lose the hue you are holding at zero saturation.
+   */
+  private syncPickerHex(targets: PaintRow[]): void {
+    if (!this.picker) return;
+    const hex = targets.find((target) => target.key === this.pickerKey)?.currentHex;
+    if (!hex || hex === this.pickerHex) return;
+    this.pickerHex = hex;
+    this.picker.showHex(hex);
+  }
+
+  // ------------------------------------------------------------- schemes
+
+  private syncSchemes({ schemes, activeId }: SchemeView): void {
+    if (!this.moved('schemes', [activeId, schemes.map((s) => [s.id, s.colors])])) {
+      writeNames(this.schemeInputs, schemes);
+      return;
+    }
+    this.schemeInputs.clear();
+
+    clear(this.schemesBody);
+    schemes.forEach((scheme, index) => {
+      const colors = Object.values(scheme.colors);
+      const nameInput = renameInput('scheme-name', scheme.name, (value) =>
+        this.cb.onRenameScheme(scheme.id, value),
+      );
+      this.schemeInputs.set(scheme.id, nameInput);
+
+      const row = el('div', { class: `paint-row${scheme.id === activeId ? ' selected' : ''}` }, [
+        miniSwatches(colors, 5),
+        el('div', { class: 'paint-meta' }, [
+          nameInput,
+          el('div', {
+            class: 'paint-sub',
+            text:
+              index < 3
+                ? `key ${index + 1} · ${colors.length} colours`
+                : `${colors.length} colours`,
+          }),
+        ]),
+      ]);
+
+      const actions = el('div', { class: 'row-actions' }, [
+        el('button', {
+          class: 'btn',
+          text: 'Apply',
+          disabled: colors.length === 0,
+          onclick: () => this.cb.onApplyScheme(scheme.id),
+        }),
+        el('button', {
+          class: 'btn',
+          text: 'Save current',
+          title: 'Store every wall colour into this slot',
+          onclick: () => this.cb.onCaptureScheme(scheme.id),
+        }),
+      ]);
+
+      this.schemesBody.append(row, actions);
+    });
+  }
+
+  // ------------------------------------------------------------- library
+
+  private syncLibrary(library: LibraryColor[]): void {
+    if (
+      this.moved(
+        'library',
+        library.map((entry) => [entry.id, entry.hex]),
+      )
+    ) {
+      this.picker?.renderLibrary(library);
+      this.buildLibrary(library);
+    } else {
+      writeNames(this.libraryInputs, library);
+    }
+    this.applyLibraryFocus();
+  }
+
+  private buildLibrary(library: LibraryColor[]): void {
+    this.libraryInputs.clear();
+    clear(this.libraryBody);
+
+    if (library.length === 0) {
+      this.libraryBody.appendChild(
+        el('div', {
+          class: 'sb-empty',
+          text: 'Empty. Pick a colour on a wall and press “Save…” to name and keep it.',
+        }),
+      );
+      return;
+    }
+
+    const list = el('div', { class: 'lib-list' });
+    for (const entry of library) {
+      const nameInput = renameInput('library-name', entry.name, (value) =>
+        this.cb.onRenameLibraryColor(entry.id, value),
+      );
+      nameInput.classList.add('lib-name');
+      this.libraryInputs.set(entry.id, nameInput);
+
+      list.appendChild(
+        el('div', { class: 'lib-item' }, [
+          el('div', {
+            class: 'swatch',
+            style: `background:${entry.hex}`,
+            title: `Apply ${entry.hex.toUpperCase()} to the selected wall`,
+            onclick: () => this.cb.onApplyLibraryColor(entry.id),
+          }),
+          nameInput,
+          el('span', { class: 'lib-hex', text: entry.hex }),
+          el('div', { class: 'actions' }, [
+            el('button', {
+              class: 'btn ghost danger',
+              text: '×',
+              title: 'Remove from library',
+              onclick: () => this.cb.onRemoveLibraryColor(entry.id),
+            }),
+          ]),
+        ]),
+      );
+    }
+    this.libraryBody.appendChild(list);
+  }
+
+  private applyLibraryFocus(): void {
+    if (!this.pendingLibraryFocus) return;
+    const input = this.libraryInputs.get(this.pendingLibraryFocus);
+    if (!input) return;
+    this.pendingLibraryFocus = null;
+    input.focus();
+    input.select();
   }
 
   // ------------------------------------------------------------- tagging
 
-  renderMaterials(materials: MaterialInfo[]): void {
+  private syncMaterials(materials: MaterialInfo[]): void {
+    if (!this.moved('materials', materials)) return;
+
     clear(this.materialsBody);
     if (materials.length === 0) {
       this.materialsBody.appendChild(
@@ -271,110 +532,26 @@ export class Sidebar {
       );
     }
   }
+}
 
-  // ------------------------------------------------------------- schemes
-
-  renderSchemes({ schemes, activeId }: SchemeView): void {
-    clear(this.schemesBody);
-    schemes.forEach((scheme, index) => {
-      const colors = Object.values(scheme.colors);
-      const nameInput = renameInput('scheme-name', scheme.name, (value) =>
-        this.cb.onRenameScheme(scheme.id, value),
-      );
-
-      const row = el('div', { class: `paint-row${scheme.id === activeId ? ' selected' : ''}` }, [
-        miniSwatches(colors, 5),
-        el('div', { class: 'paint-meta' }, [
-          nameInput,
-          el('div', {
-            class: 'paint-sub',
-            text:
-              index < 3
-                ? `key ${index + 1} · ${colors.length} colours`
-                : `${colors.length} colours`,
-          }),
-        ]),
-      ]);
-
-      const actions = el('div', { class: 'row-actions' }, [
-        el('button', {
-          class: 'btn',
-          text: 'Apply',
-          disabled: Object.keys(scheme.colors).length === 0,
-          onclick: () => this.cb.onApplyScheme(scheme.id),
-        }),
-        el('button', {
-          class: 'btn',
-          text: 'Save current',
-          title: 'Store every wall colour into this slot',
-          onclick: () => this.cb.onCaptureScheme(scheme.id),
-        }),
-      ]);
-
-      this.schemesBody.append(row, actions);
-    });
+/** Renamed elsewhere (an import, another view) — but never under a live caret. */
+function writeNames(
+  inputs: Map<string, HTMLInputElement>,
+  entries: { id: string; name: string }[],
+): void {
+  for (const entry of entries) {
+    const input = inputs.get(entry.id);
+    if (!input || input === input.ownerDocument.activeElement) continue;
+    if (input.value !== entry.name) input.value = entry.name;
   }
+}
 
-  // ------------------------------------------------------------- library
+function sameKeys(order: string[], targets: PaintRow[]): boolean {
+  return order.length === targets.length && targets.every((target, i) => target.key === order[i]);
+}
 
-  renderLibrary(library: LibraryColor[]): void {
-    this.library = library;
-    this.picker?.renderLibrary(library);
-    clear(this.libraryBody);
-
-    if (library.length === 0) {
-      this.libraryBody.appendChild(
-        el('div', {
-          class: 'sb-empty',
-          text: 'Empty. Pick a colour on a wall and press “Save…” to name and keep it.',
-        }),
-      );
-      return;
-    }
-
-    const list = el('div', { class: 'lib-list' });
-    for (const entry of library) {
-      const nameInput = renameInput('library-name', entry.name, (value) =>
-        this.cb.onRenameLibraryColor(entry.id, value),
-      );
-      nameInput.classList.add('lib-name');
-
-      list.appendChild(
-        el('div', { class: 'lib-item' }, [
-          el('div', {
-            class: 'swatch',
-            style: `background:${entry.hex}`,
-            title: `Apply ${entry.hex.toUpperCase()} to the selected wall`,
-            onclick: () => this.cb.onApplyLibraryColor(entry.id),
-          }),
-          nameInput,
-          el('span', { class: 'lib-hex', text: entry.hex }),
-          el('div', { class: 'actions' }, [
-            el('button', {
-              class: 'btn ghost danger',
-              text: '×',
-              title: 'Remove from library',
-              onclick: () => this.cb.onRemoveLibraryColor(entry.id),
-            }),
-          ]),
-        ]),
-      );
-
-      if (this.pendingLibraryFocus === entry.id) {
-        this.pendingLibraryFocus = null;
-        queueMicrotask(() => {
-          nameInput.focus();
-          nameInput.select();
-        });
-      }
-    }
-    this.libraryBody.appendChild(list);
-  }
-
-  /** Focus the name field of a freshly saved colour, so you can type its name. */
-  focusLibraryEntry(id: string): void {
-    this.pendingLibraryFocus = id;
-  }
+function resetTitle(originalHex: string): string {
+  return `Reset to exported colour (${originalHex.toUpperCase()})`;
 }
 
 /** Editable name field: commits on change, Enter blurs, keys never leak to hotkeys. */

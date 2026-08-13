@@ -110,6 +110,19 @@ describe('material discovery', () => {
     expect(registry.get('Floor_Oak')?.auto).toBe(false);
   });
 
+  it('refreshes its sorted views after a re-discovery', () => {
+    const { root, registry } = buildScene();
+    // Read both first: they are cached per discovery, so this is what a stale
+    // cache would go on serving.
+    expect(registry.list().map((t) => t.key)).not.toContain('Floor_Oak');
+    expect(registry.allMaterials().find((m) => m.name === 'Floor_Oak')?.isPaintable).toBe(false);
+
+    registry.discover(root, { tagged: ['Floor_Oak'] });
+
+    expect(registry.list().map((t) => t.key)).toContain('Floor_Oak');
+    expect(registry.allMaterials().find((m) => m.name === 'Floor_Oak')?.isPaintable).toBe(true);
+  });
+
   it('resolves a raycast hit back to its target', () => {
     const { root, registry } = buildScene();
     const wall = findWall(root, 'PAINT_Living_North');
@@ -145,14 +158,14 @@ describe('colour pipeline', () => {
   it('resets a wall to its exported colour', () => {
     const { registry } = buildScene();
     const target = registry.get('PAINT_Living_East')!;
-    const exported = target.exportedHex;
+    const original = target.originalHex;
 
     registry.setColor(target.key, '#ff0000');
     expect(target.currentHex).toBe('#ff0000');
 
     registry.resetColor(target.key);
-    expect(target.currentHex).toBe(exported);
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(exported.slice(1));
+    expect(target.currentHex).toBe(original);
+    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(original.slice(1));
   });
 
   it('captures and re-applies a scheme', () => {
@@ -194,7 +207,7 @@ describe('colour pipeline', () => {
 
   it('still knows the exported colour after a re-discovery of a painted scene', () => {
     const { root, registry } = buildScene();
-    const exported = registry.get('PAINT_Living_North')!.exportedHex;
+    const exported = registry.get('PAINT_Living_North')!.originalHex;
     expect(exported).not.toBe('#abcdef');
 
     registry.setColor('PAINT_Living_North', '#abcdef');
@@ -203,7 +216,7 @@ describe('colour pipeline', () => {
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
     const target = registry.get('PAINT_Living_North')!;
-    expect(target.exportedHex).toBe(exported);
+    expect(target.originalHex).toBe(exported);
 
     registry.resetColor(target.key);
     expect(target.currentHex).toBe(exported);
@@ -221,7 +234,7 @@ describe('colour pipeline', () => {
     (wall.material as MeshStandardMaterial).color.setStyle('#102030', SRGBColorSpace);
     registry.discover(other);
 
-    expect(registry.get('PAINT_Living_North')!.exportedHex).toBe('#102030');
+    expect(registry.get('PAINT_Living_North')!.originalHex).toBe('#102030');
   });
 });
 
