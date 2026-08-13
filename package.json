@@ -1,0 +1,29 @@
+{
+  "name": "repaint",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Repaint \u2014 interactive 3D viewer for a Blender apartment scene with live wall-paint recoloring.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "serve:dist": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:portable": "npm run build && node scripts/make-portable.mjs"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "stats.js": "^0.17.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/stats.js": "^0.17.4",
+    "@types/three": "^0.185.4",
+    "typescript": "^5.9.2",
+    "vite": "^8.2.1",
+    "vitest": "^3.2.4"
+  }
+}

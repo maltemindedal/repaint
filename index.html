@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M6 22V12l10-6 10 6v10z' fill='none' stroke='%23c9c9c9' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='3.2' fill='%23e8e4da'/%3E%3C/svg%3E"
+    />
+    <title>Repaint</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="viewport">
+        <canvas id="canvas"></canvas>
+
+        <!-- Top-left: mode + scheme controls -->
+        <div id="toolbar" class="panel floating"></div>
+
+        <!-- Bottom-left: transient status line -->
+        <div id="status" class="floating" aria-live="polite"></div>
+
+        <!-- Drag-and-drop overlay -->
+        <div id="dropzone">
+          <div class="dropzone-inner">
+            <div class="dropzone-icon">＋</div>
+            <div class="dropzone-title">Drop a .glb here</div>
+            <div class="dropzone-sub">Exported from Blender with <code>PAINT_</code> materials</div>
+          </div>
+        </div>
+
+        <!-- Loading / progress -->
+        <div id="loading" hidden>
+          <div class="loading-card">
+            <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+            <div class="loading-label">Loading…</div>
+          </div>
+        </div>
+
+        <!-- Help overlay (toggled with ?) -->
+        <div id="help" hidden></div>
+      </div>
+
+      <aside id="sidebar"></aside>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
