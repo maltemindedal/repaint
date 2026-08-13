@@ -40,9 +40,10 @@ at the first.
 
 ## Not a package script
 
-| Command                               | Purpose                                                                                                                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `node test/fixtures/make-fixture.mjs` | Generates `test/fixtures/apartment-fixture.glb`, a convention-following file for manual testing of the loader, the occlusion→lightmap rerouting, `TEXCOORD_1` and `START_CAM`. Gitignored. |
+| Command                                                                    | Purpose                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node test/fixtures/make-fixture.mjs`                                      | Generates `test/fixtures/apartment-fixture.glb`, a convention-following file for manual testing of the loader, the occlusion→lightmap rerouting, `TEXCOORD_1` and `START_CAM`. Gitignored.                                                 |
+| `blender --background <file>.blend --python scripts/bake_export.py -- ...` | Headless bake-and-export pipeline: lightmap UVs, atlas unwrap, Cycles bake, `glTF Material Output` wiring, `.glb` export. See [Baking lighting § Automating this guide](../guides/baking-lighting.md#automating-this-guide-with-a-script). |
 
 ## Toolchain versions
 
