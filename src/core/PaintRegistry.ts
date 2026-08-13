@@ -46,7 +46,13 @@ export class PaintRegistry {
   private byMaterial = new Map<MeshStandardMaterial, string>();
   private scratch = new Color();
 
-  /** Rebuilds from a scene graph. Safe to call again after re-tagging. */
+  /**
+   * Rebuilds from a scene graph. Safe to call again after re-tagging.
+   *
+   * Reads colour, never writes it: a target comes back on whatever the graph
+   * currently says, both `originalHex` and `currentHex`. Putting back what was
+   * on screen belongs to `SceneSession.discoverTargets`.
+   */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
     const tagged = new Set(options.tagged ?? []);
     const untagged = new Set(options.untagged ?? []);
@@ -68,10 +74,6 @@ export class PaintRegistry {
       }
     });
 
-    // Preserve any colour already applied to a surviving target across a
-    // re-discovery (e.g. after toggling a manual tag).
-    const previous = new Map([...this.targets].map(([k, t]) => [k, t.currentHex]));
-
     this.targets.clear();
     this.byMaterial.clear();
 
@@ -87,16 +89,11 @@ export class PaintRegistry {
         materials: group.materials,
         meshes: group.meshes,
         originalHex,
-        currentHex: previous.get(group.name) ?? originalHex,
+        currentHex: originalHex,
         auto,
       };
       this.targets.set(group.name, target);
       for (const mat of group.materials) this.byMaterial.set(mat, group.name);
-    }
-
-    // Re-apply preserved colours so the GPU state matches `currentHex`.
-    for (const target of this.targets.values()) {
-      if (target.currentHex !== target.originalHex) this.setColor(target.key, target.currentHex);
     }
   }
 
