@@ -1,0 +1,5 @@
+# pnpm settings for this (single-package) repo.
+# pnpm blocks dependency build scripts unless allowed here — esbuild needs its
+# postinstall to unpack the platform binary that Vite and Vitest run.
+allowBuilds:
+  esbuild: true

@@ -5,21 +5,21 @@ wall, paste a paint hex, and flip between colour schemes while standing in the s
 spot.
 
 ```bash
-npm install
-npm run dev          # http://localhost:5173
+pnpm install
+pnpm dev             # http://localhost:5173
 ```
 
 Static build:
 
 ```bash
-npm run build        # typechecks, then emits dist/
-npm run serve:dist   # serves dist/ at http://localhost:4173
+pnpm build           # typechecks, then emits dist/
+pnpm serve:dist      # serves dist/ at http://localhost:4173
 ```
 
 > `dist/` needs to be **served**, not opened as `file://`. Browsers block ES modules
 > and WASM fetches on the `file://` protocol, so double-clicking `dist/index.html`
-> gives you a blank page. `npm run serve:dist` (or any static server —
-> `npx serve dist`, `python3 -m http.server`) is the way. The build uses a relative
+> gives you a blank page. `pnpm serve:dist` (or any static server —
+> `pnpm dlx serve dist`, `python3 -m http.server`) is the way. The build uses a relative
 > `base`, so it also works from a subfolder on any host.
 
 Nothing leaves your machine: no backend, no uploads, no analytics. Your GLB is read
@@ -227,9 +227,9 @@ offline:
 
 - **Draco** geometry — tick **Compression** in the exporter.
 - **meshopt** (`EXT_meshopt_compression`) — Blender can't emit this, but
-  `npx @gltf-transform/cli meshopt in.glb out.glb` can, and the app reads it.
+  `pnpm dlx @gltf-transform/cli meshopt in.glb out.glb` can, and the app reads it.
 - **KTX2/Basis** textures (`KHR_texture_basisu`) — likewise via
-  `npx @gltf-transform/cli uastc in.glb out.glb` (or `etc1s` for smaller files).
+  `pnpm dlx @gltf-transform/cli uastc in.glb out.glb` (or `etc1s` for smaller files).
   This is the single biggest VRAM win for a lightmap-heavy apartment.
 
 The decoder WASM ships with three.js and is emitted into `dist/assets` by Vite, so
@@ -248,7 +248,7 @@ Before debugging the app, confirm the file itself is right:
 1. Open <https://gltf-viewer.donmccurdy.com/> and drag your `.glb` in. If the room
    looks wrong there, it's the export, not this app.
 2. In that viewer, check the material list for your `PAINT_` names.
-3. `npx @gltf-transform/cli inspect yourfile.glb` prints materials, textures,
+3. `pnpm dlx @gltf-transform/cli inspect yourfile.glb` prints materials, textures,
    compression and, crucially, which `TEXCOORD` sets each mesh carries.
 
 In this app, press `` ` `` for the debug panel (mesh/triangle/texture counts,
@@ -494,7 +494,7 @@ slots each time would undo the targeted row update the sidebar does.
 real pipeline headlessly in node:
 
 ```bash
-npm test
+pnpm test
 ```
 
 They build the procedural room, run discovery against it, and check the colour
@@ -525,9 +525,9 @@ Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):
 
 ```bash
-npm run lint           # oxlint
-npm run format         # oxfmt --write
-npm run check          # typecheck + lint + format check, in one
+pnpm lint              # oxlint
+pnpm format            # oxfmt --write
+pnpm check             # typecheck + lint + format check, in one
 ```
 
 For manual testing against an actual glTF file — the loader, the occlusion→lightmap
@@ -540,7 +540,7 @@ node test/fixtures/make-fixture.mjs   # → test/fixtures/apartment-fixture.glb
 It deliberately includes a mesh named `PAINT_Floor_Mesh` whose material is
 `Floor_Oak`, to prove discovery ignores mesh names.
 
-In `npm run dev`, `window.apt` is the app instance — `apt.registry.list()`,
+In `pnpm dev`, `window.apt` is the app instance — `apt.registry.list()`,
 `apt.scene.stats`, `apt.viewer.renderer.info` are handy when a scene misbehaves.
 
 ---
