@@ -6,7 +6,7 @@ import { Picker } from './core/Picker.ts';
 import { defaultPose } from './core/processScene.ts';
 import { NavigationController } from './nav/NavigationController.ts';
 import { AppStore } from './state/store.ts';
-import { Sidebar } from './ui/Sidebar.ts';
+import { Sidebar, type SidebarViewModel } from './ui/Sidebar.ts';
 import { Toolbar } from './ui/Toolbar.ts';
 import { DropZone } from './ui/DropZone.ts';
 import { DebugPanel } from './ui/DebugPanel.ts';
@@ -37,6 +37,7 @@ class App {
 
   private scene: LoadedScene | null = null;
   private selectedKey: string | null = null;
+  private hoveredKey: string | null = null;
   private perfChecked = false;
   private loadedAt = 0;
 
@@ -60,7 +61,7 @@ class App {
       onSaveToLibrary: (hex) => this.saveToLibrary(hex),
       onRemoveLibraryColor: (id) => {
         this.store.removeLibraryColor(id);
-        this.renderLibrary();
+        this.renderSidebar();
       },
       onRenameLibraryColor: (id, name) => this.store.renameLibraryColor(id, name),
       onApplyLibraryColor: (id) => this.applyLibraryColor(id),
@@ -68,7 +69,8 @@ class App {
       onCaptureScheme: (id) => this.captureScheme(id),
       onRenameScheme: (id, name) => {
         this.store.renameScheme(id, name);
-        this.renderSchemes();
+        this.renderToolbar();
+        this.renderSidebar();
       },
       onExportData: () => this.exportData(),
       onImportData: () => void this.importData(),
@@ -90,7 +92,10 @@ class App {
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
-    this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
+    this.picker.onHover = (target) => {
+      this.hoveredKey = target?.key ?? null;
+      this.renderSidebar();
+    };
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
     this.picker.onDoubleClick = (point) => this.nav.focusPoint(point);
 
@@ -209,10 +214,8 @@ class App {
     this.nav.applyPose(savedPose ?? scene.startCam ?? defaultPose(scene.bounds));
 
     this.applySettings();
-    this.sidebar.setFileLabel(scene.label);
-    this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.renderSchemes();
-    this.renderLibrary();
+    this.renderToolbar();
+    this.renderSidebar();
 
     if (!scene.isFallback && this.registry.size === 0) {
       this.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
@@ -231,9 +234,8 @@ class App {
     }
 
     this.picker.refreshTargets();
-    this.sidebar.renderPaintTargets(this.registry.list(), this.store.library);
     if (this.selectedKey && !this.registry.get(this.selectedKey)) this.selectedKey = null;
-    this.sidebar.setSelected(this.selectedKey, false);
+    this.renderSidebar();
   }
 
   // -------------------------------------------------------------- colour
@@ -242,7 +244,8 @@ class App {
     if (!this.registry.setColor(key, hex)) return;
     this.store.setCurrentColor(key, hex);
     this.store.setActiveScheme(null);
-    this.toolbar.renderSchemes({ schemes: this.store.schemes, activeId: null });
+    this.renderToolbar();
+    this.renderSidebar();
   }
 
   private resetTarget(key: string): void {
@@ -250,29 +253,22 @@ class App {
     if (!target) return;
     this.registry.resetColor(key);
     this.store.clearCurrentColor(key);
-    this.sidebar.updateTarget(key, target.currentHex);
-    if (this.selectedKey === key) this.sidebar.syncPicker(target.currentHex);
+    this.renderSidebar();
     this.status(`${target.displayName} → exported colour ${target.originalHex.toUpperCase()}`);
   }
 
   private resetAll(): void {
     this.registry.resetAll();
-    for (const target of this.registry.list()) {
-      this.store.clearCurrentColor(target.key);
-      this.sidebar.updateTarget(target.key, target.currentHex);
-    }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
+    for (const target of this.registry.list()) this.store.clearCurrentColor(target.key);
     this.store.setActiveScheme(null);
-    this.renderSchemes();
+    this.renderToolbar();
+    this.renderSidebar();
     this.status('All walls back to their exported colours');
   }
 
   private select(key: string | null): void {
     this.selectedKey = key;
-    this.sidebar.setSelected(key);
+    this.renderSidebar();
     const target = key ? this.registry.get(key) : null;
     if (target) this.picker.selectPulse(target);
   }
@@ -282,8 +278,8 @@ class App {
     const suggested = target ? `${target.displayName} ${hex.toUpperCase()}` : hex.toUpperCase();
     const entry = this.store.addLibraryColor(suggested, hex);
     if (!entry) return;
+    this.renderSidebar();
     this.sidebar.focusLibraryEntry(entry.id);
-    this.renderLibrary();
     this.status('Saved to library — type a name in the sidebar');
   }
 
@@ -295,8 +291,6 @@ class App {
       return;
     }
     this.setColor(this.selectedKey, entry.hex);
-    this.sidebar.updateTarget(this.selectedKey, entry.hex);
-    this.sidebar.syncPicker(entry.hex);
     this.status(`${entry.name} applied`);
   }
 
@@ -313,42 +307,63 @@ class App {
 
     const applied = this.registry.applyScheme(scheme.colors);
     for (const target of this.registry.list()) {
-      this.sidebar.updateTarget(target.key, target.currentHex);
       this.store.setCurrentColor(target.key, target.currentHex);
     }
-    if (this.selectedKey) {
-      const target = this.registry.get(this.selectedKey);
-      if (target) this.sidebar.syncPicker(target.currentHex);
-    }
     this.store.setActiveScheme(id);
-    this.renderSchemes();
+    this.renderToolbar();
+    this.renderSidebar();
     this.status(`${scheme.name} — ${applied}/${count} colours applied`);
   }
 
   private captureScheme(id: string): void {
     this.store.saveScheme(id, this.registry.capture());
     this.store.setActiveScheme(id);
-    this.renderSchemes();
+    this.renderToolbar();
+    this.renderSidebar();
     const scheme = this.store.schemes.find((s) => s.id === id);
     this.status(`Saved current colours into “${scheme?.name ?? id}”`);
   }
 
-  private renderSchemes(): void {
-    const view: SchemeView = { schemes: this.store.schemes, activeId: this.store.activeSchemeId };
-    this.toolbar.renderSchemes(view);
-    this.sidebar.renderSchemes(view);
+  // -------------------------------------------------------------- views
+
+  /**
+   * Everything the sidebar draws, as one plain object. Rebuilt per render
+   * rather than handed out live: the rows are snapshots, so the sidebar can
+   * tell a changed colour from an unchanged one.
+   */
+  private sidebarViewModel(): SidebarViewModel {
+    return {
+      fileLabel: this.scene?.label ?? '—',
+      targets: this.registry.list().map((target) => ({
+        key: target.key,
+        displayName: target.displayName,
+        originalHex: target.originalHex,
+        currentHex: target.currentHex,
+      })),
+      materials: this.registry.allMaterials(),
+      library: this.store.library,
+      schemes: this.store.schemes,
+      activeId: this.store.activeSchemeId,
+      selectedKey: this.selectedKey,
+      hoveredKey: this.hoveredKey,
+    };
   }
 
-  private renderLibrary(): void {
-    this.sidebar.renderLibrary(this.store.library);
+  /** Cheap — the sidebar diffs internally, so this is fine on a picker drag. */
+  private renderSidebar(): void {
+    this.sidebar.render(this.sidebarViewModel());
+  }
+
+  private renderToolbar(): void {
+    const view: SchemeView = { schemes: this.store.schemes, activeId: this.store.activeSchemeId };
+    this.toolbar.renderSchemes(view);
   }
 
   private refreshAll(): void {
     this.rediscover();
-    this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.renderSchemes();
-    this.renderLibrary();
     this.applySettings();
+    this.renderToolbar();
+    this.renderSidebar();
   }
 
   // ------------------------------------------------------------- tagging
@@ -357,7 +372,6 @@ class App {
     const info = this.registry.allMaterials().find((m) => m.name === materialName);
     this.store.setTagged(materialName, tagged, info?.auto ?? false);
     this.rediscover();
-    this.sidebar.renderMaterials(this.registry.allMaterials());
     this.status(`${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`);
   }
 

@@ -26,6 +26,7 @@
   "devDependencies": {
     "@types/stats.js": "^0.17.4",
     "@types/three": "^0.185.4",
+    "happy-dom": "^20.11.2",
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
     "typescript": "^5.9.2",

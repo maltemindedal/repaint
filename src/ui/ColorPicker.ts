@@ -148,11 +148,25 @@ export class ColorPicker {
     }
   }
 
+  /** A colour the user chose *here* — swatches move and `onChange` fires. */
   setHex(hex: string): void {
     const parsed = normalizeHex(hex);
     if (!parsed) return;
     this.hsv = hexToHsv(parsed);
     this.sync(true);
+  }
+
+  /**
+   * A colour applied somewhere else (a scheme, a library click, a reset).
+   * Silent on purpose: the app already knows, and echoing it back through
+   * `onChange` would land as a fresh manual edit — which is what forced call
+   * sites to sync the picker *before* recording the change that caused it.
+   */
+  showHex(hex: string): void {
+    const parsed = normalizeHex(hex);
+    if (!parsed) return;
+    this.hsv = hexToHsv(parsed);
+    this.sync();
   }
 
   private sync(notify = false, keepInput = false): void {

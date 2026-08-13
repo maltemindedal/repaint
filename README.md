@@ -440,12 +440,15 @@ src/
     storage.ts             localStorage + memory fallback; validating migration
   ui/                      Sidebar, ColorPicker, Toolbar, DropZone, DebugPanel,
                            HelpOverlay, StatusPanel (toasts/loading), swatches
+    Sidebar.ts             One `render(viewModel)`; diffs internally so it can
+                           be re-rendered on every pointermove of a colour drag
     MobileGate.ts          Touch-only devices get the "use a desktop" page in
                            index.html instead of a booted app
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
 test/
   smoke.test.ts            22 tests over the fallback scene
+  sidebar.test.ts          16 tests over the sidebar's view model and diffing
   fixtures/make-fixture.mjs  Generates a convention-following GLB for manual testing
 ```
 
@@ -459,6 +462,12 @@ npm test
 It builds the procedural room, runs discovery against it, and checks the colour
 write path, scheme capture/apply, name cleanup, persistence round-trips, the
 ORM-vs-lightmap classification, and that corrupt saved data is sanitised.
+
+`sidebar.test.ts` runs against happy-dom instead (a `@vitest-environment`
+docblock, so the rest of the suite stays in plain node). The sidebar takes its
+whole state as one plain object, so the panel's behaviour — which sections a
+render rebuilds, which it leaves standing, and what survives an open colour
+picker — is assertable without a browser.
 
 Linting and formatting are [oxlint](https://oxc.rs) and oxfmt (configs in
 `.oxlintrc.json` / `.oxfmtrc.json`):
