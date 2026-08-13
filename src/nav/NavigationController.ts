@@ -52,6 +52,14 @@ export class NavigationController {
 
   setMode(mode: NavMode): void {
     if (mode === this._mode) return;
+
+    // Capture-out, then restore-in. Walk mode only reports a pose once the
+    // camera has been still for half a second, so switching away sooner than
+    // that would drop the spot you were actually standing at. Emitting here —
+    // while `_mode` is still the outgoing one, so `getPose` reads the right
+    // controller — persists it before the hand-off.
+    this.emitPose();
+
     this._mode = mode;
 
     if (mode === 'walk') {
