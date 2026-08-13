@@ -9,14 +9,14 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "serve:dist": "vite preview --port 4173",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "build:portable": "pnpm run build && node scripts/make-portable.mjs",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check": "tsc --noEmit && oxlint && oxfmt --check"
+    "check": "tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint && oxfmt --check"
   },
   "dependencies": {
     "lil-gui": "^0.21.0",
@@ -24,6 +24,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/stats.js": "^0.17.4",
     "@types/three": "^0.185.4",
     "happy-dom": "^20.11.2",

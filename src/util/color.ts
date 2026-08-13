@@ -10,9 +10,9 @@ const HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
 /** Normalises `e8e4da`, `#E8E4DA`, `#eda` -> `#e8e4da`. Returns null if invalid. */
 export function normalizeHex(input: string): string | null {
   const m = HEX_RE.exec(input.trim());
-  if (!m) return null;
+  if (!m || m[1] === undefined) return null;
   let body = m[1].toLowerCase();
-  if (body.length === 3) body = body[0] + body[0] + body[1] + body[1] + body[2] + body[2];
+  if (body.length === 3) body = body.replace(/./g, '$&$&');
   return `#${body}`;
 }
 
@@ -22,7 +22,7 @@ export function normalizeHex(input: string): string | null {
  */
 export function extractHex(input: string): string | null {
   const m = /#?\b([0-9a-f]{6})\b/i.exec(input) ?? /#([0-9a-f]{3})\b/i.exec(input);
-  return m ? normalizeHex(m[1]) : normalizeHex(input);
+  return m?.[1] !== undefined ? normalizeHex(m[1]) : normalizeHex(input);
 }
 
 export interface HSV {

@@ -564,7 +564,7 @@ function renameInput(
   input.addEventListener('change', () => onCommit(input.value));
   input.addEventListener('keydown', (event) => {
     event.stopPropagation();
-    if ((event as KeyboardEvent).key === 'Enter') input.blur();
+    if (event.key === 'Enter') input.blur();
   });
   return input;
 }

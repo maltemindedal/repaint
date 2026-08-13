@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { must } from './helpers.ts';
 import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { NavigationController } from '../src/nav/NavigationController.ts';
 import type { CameraPose, NavMode } from '../src/types.ts';
@@ -121,15 +122,15 @@ describe('mode switching', () => {
 
     expect(nav.mode).toBe('walk');
     expect(emitted).toHaveLength(1);
-    expect(emitted[0].mode).toBe('walk');
+    expect(must(emitted[0]).mode).toBe('walk');
 
     // Compare against the camera a frame later — that is what renders. Reading
     // getPose() back instead would only compare one function against itself.
     nav.update(1 / 60);
     expect(emitted).toHaveLength(1);
-    expect(distance(emitted[0].pose.position, camera.position.toArray() as Triple)).toBeLessThan(
-      1e-6,
-    );
+    expect(
+      distance(must(emitted[0]).pose.position, camera.position.toArray() as Triple),
+    ).toBeLessThan(1e-6);
   });
 
   it('drops to eye height before reporting, so the view does not tilt', () => {
@@ -139,8 +140,8 @@ describe('mode switching', () => {
 
     // Pairing the old camera height with a target computed at the new one would
     // emit a level view as an ~8.5° downward tilt, which a restore then adopts.
-    expect(emitted[0].pose.position[1]).toBeCloseTo(EYE_HEIGHT, 5);
-    expect(pitchOf(emitted[0].pose)).toBeCloseTo(0, 1);
+    expect(must(emitted[0]).pose.position[1]).toBeCloseTo(EYE_HEIGHT, 5);
+    expect(pitchOf(must(emitted[0]).pose)).toBeCloseTo(0, 1);
   });
 
   it('emits the restored pose, not the carried-over one', () => {
@@ -151,8 +152,8 @@ describe('mode switching', () => {
     expect(emitted).toHaveLength(1);
     // The carried-over camera stood at ORBIT_POSE; the emitted pose is where
     // walk mode actually ended up.
-    expect(distance(emitted[0].pose.position, WALK_POSE.position)).toBeLessThan(1e-6);
-    expect(distance(emitted[0].pose.position, ORBIT_POSE.position)).toBeGreaterThan(1);
+    expect(distance(must(emitted[0]).pose.position, WALK_POSE.position)).toBeLessThan(1e-6);
+    expect(distance(must(emitted[0]).pose.position, ORBIT_POSE.position)).toBeGreaterThan(1);
   });
 
   it("keeps each mode's pose stable across repeated toggles", () => {

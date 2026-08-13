@@ -109,7 +109,7 @@ export class ColorPicker {
 
     // Pasting a whole product name is the common case.
     this.hexInput.addEventListener('paste', (event) => {
-      const text = (event as ClipboardEvent).clipboardData?.getData('text') ?? '';
+      const text = event.clipboardData?.getData('text') ?? '';
       const parsed = extractHex(text);
       if (!parsed) return;
       event.preventDefault();
@@ -123,7 +123,7 @@ export class ColorPicker {
     });
 
     this.hexInput.addEventListener('keydown', (event) => {
-      if ((event as KeyboardEvent).key === 'Enter') this.hexInput.blur();
+      if (event.key === 'Enter') this.hexInput.blur();
       event.stopPropagation();
     });
   }

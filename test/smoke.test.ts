@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { must } from './helpers.ts';
 import {
   DataTexture,
   Group,
@@ -14,6 +15,7 @@ import { processScene, defaultPose } from '../src/core/processScene.ts';
 import { PaintRegistry, displayNameFor } from '../src/core/PaintRegistry.ts';
 import { AppStore } from '../src/state/store.ts';
 import { emptyData, migrate } from '../src/state/storage.ts';
+import { isMesh, isStandard } from '../src/core/materials.ts';
 import { extractHex, hexToHsv, hsvToHex, normalizeHex } from '../src/util/color.ts';
 
 /**
@@ -30,11 +32,18 @@ function buildScene() {
   return { root, processed, registry };
 }
 
+/** The mesh's sole material, checked to be a MeshStandardMaterial. */
+function materialOf(mesh: Mesh): MeshStandardMaterial {
+  const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  if (!mat || !isStandard(mat)) throw new Error(`Mesh ${mesh.name} has no standard material`);
+  return mat;
+}
+
 /** The wall mesh wearing `materialName` — discovery is by material, never mesh. */
 function findWall(root: Object3D, materialName: string): Mesh {
   const wall = root.children.find(
-    (c) => ((c as Mesh).material as MeshStandardMaterial)?.name === materialName,
-  ) as Mesh | undefined;
+    (c): c is Mesh => isMesh(c) && !Array.isArray(c.material) && c.material.name === materialName,
+  );
   if (!wall) throw new Error(`No mesh uses material ${materialName}`);
   return wall;
 }
@@ -47,13 +56,13 @@ describe('fallback scene', () => {
     expect(processed.stats.triangles).toBeGreaterThan(0);
     expect(processed.bakedMaterials.length).toBeGreaterThan(0);
 
-    const walls = root.children.filter((child) =>
-      ((child as Mesh).material as MeshStandardMaterial)?.name?.startsWith('PAINT_'),
-    ) as Mesh[];
+    const walls = root.children.filter(
+      (child): child is Mesh => isMesh(child) && materialOf(child).name.startsWith('PAINT_'),
+    );
     expect(walls.length).toBeGreaterThanOrEqual(2);
 
     for (const wall of walls) {
-      const material = wall.material as MeshStandardMaterial;
+      const material = materialOf(wall);
       // A lightmap is useless without the UV channel it samples.
       expect(wall.geometry.getAttribute('uv1')).toBeTruthy();
       expect(material.lightMap).toBeTruthy();
@@ -140,12 +149,12 @@ describe('colour pipeline', () => {
 
     expect(target.currentHex).toBe('#e8e4da');
     // The value that actually reaches the GPU must read back as the same sRGB hex.
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe('e8e4da');
+    expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe('e8e4da');
   });
 
   it('never invalidates the shader program on a colour change', () => {
     const { registry } = buildScene();
-    const material = registry.get('PAINT_Living_North')!.materials[0];
+    const material = must(registry.get('PAINT_Living_North')!.materials[0]);
     const before = material.version;
 
     registry.setColor('PAINT_Living_North', '#123456');
@@ -165,7 +174,7 @@ describe('colour pipeline', () => {
 
     registry.resetColor(target.key);
     expect(target.currentHex).toBe(original);
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(original.slice(1));
+    expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe(original.slice(1));
   });
 
   it('captures and re-applies a scheme', () => {
@@ -196,13 +205,16 @@ describe('colour pipeline', () => {
     // keep its own map of applied colours and push it back over the top here;
     // restoring what was on screen belongs to the store instead, one level up
     // — see test/sceneSession.test.ts.
-    registry.get('PAINT_Living_North')!.materials[0].color.setStyle('#123456', SRGBColorSpace);
+    must(registry.get('PAINT_Living_North')!.materials[0]).color.setStyle(
+      '#123456',
+      SRGBColorSpace,
+    );
 
     registry.discover(root, { tagged: ['Floor_Oak'] });
 
     const target = registry.get('PAINT_Living_North')!;
     expect(target.currentHex).toBe('#123456');
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe('123456');
+    expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe('123456');
   });
 
   it('still knows the exported colour after a re-discovery of a painted scene', () => {
@@ -220,7 +232,7 @@ describe('colour pipeline', () => {
 
     registry.resetColor(target.key);
     expect(target.currentHex).toBe(exported);
-    expect(target.materials[0].color.getHexString(SRGBColorSpace)).toBe(exported.slice(1));
+    expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe(exported.slice(1));
   });
 
   it('re-reads exported colours when a different scene is loaded', () => {
@@ -231,7 +243,7 @@ describe('colour pipeline', () => {
     // colours must not leak into it.
     const other = createFallbackScene();
     const wall = findWall(other, 'PAINT_Living_North');
-    (wall.material as MeshStandardMaterial).color.setStyle('#102030', SRGBColorSpace);
+    materialOf(wall).color.setStyle('#102030', SRGBColorSpace);
     registry.discover(other);
 
     expect(registry.get('PAINT_Living_North')!.originalHex).toBe('#102030');
@@ -270,15 +282,15 @@ describe('persistence', () => {
 
     store.useScene('other.glb');
     expect(store.scene.tagged).toEqual([]);
-    expect(store.schemes[0].colors).toEqual({});
+    expect(must(store.schemes[0]).colors).toEqual({});
     expect(store.library).toContainEqual(expect.objectContaining({ id: entry.id }));
 
     store.useScene('apartment.glb');
     expect(store.scene.tagged).toEqual(['Wall_02']);
-    expect(store.schemes[0].name).toBe('Warm white');
-    expect(store.schemes[0].colors).toEqual({ PAINT_Living_North: '#e8e4da' });
+    expect(must(store.schemes[0]).name).toBe('Warm white');
+    expect(must(store.schemes[0]).colors).toEqual({ PAINT_Living_North: '#e8e4da' });
     // Library hexes are normalised on the way in.
-    expect(store.library[0].hex).toBe('#e8e4da');
+    expect(must(store.library[0]).hex).toBe('#e8e4da');
   });
 
   it('survives a JSON export/import round trip', () => {
@@ -293,8 +305,8 @@ describe('persistence', () => {
     restored.importJSON(json, 'replace');
     restored.useScene('apartment.glb');
 
-    expect(restored.schemes[1].colors).toEqual({ PAINT_Bedroom: '#c9c2b6' });
-    expect(restored.library[0].name).toBe('Chalk');
+    expect(must(restored.schemes[1]).colors).toEqual({ PAINT_Bedroom: '#c9c2b6' });
+    expect(must(restored.library[0]).name).toBe('Chalk');
     expect(restored.settings.exposure).toBe(1.4);
   });
 
@@ -344,7 +356,7 @@ describe('persistence', () => {
       },
     });
 
-    const scene = data.scenes['x.glb'];
+    const scene = must(data.scenes['x.glb']);
     expect(scene.tagged).toEqual(['ok']);
     expect(scene.schemes).toEqual([{ id: 'slot-1', name: 'Good', colors: { PAINT_A: '#fff' } }]);
     expect(scene.poses.orbit).toBeDefined();

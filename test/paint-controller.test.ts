@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { must } from './helpers.ts';
 import { createFallbackScene } from '../src/core/fallbackScene.ts';
 import { PaintRegistry } from '../src/core/PaintRegistry.ts';
 import { PaintController, type PaintChange, type PaintStore } from '../src/core/PaintController.ts';
@@ -57,7 +58,7 @@ describe('paint fan-out', () => {
     expect(registry.get('PAINT_Living_North')?.currentHex).toBe('#3a7fd5');
     expect(store.current).toEqual({ PAINT_Living_North: '#3a7fd5' });
     expect(changes).toHaveLength(1);
-    expect([...changes[0].colors]).toEqual([['PAINT_Living_North', '#3a7fd5']]);
+    expect([...must(changes[0]).colors]).toEqual([['PAINT_Living_North', '#3a7fd5']]);
   });
 
   it('drops the active scheme once, not on every write of a picker drag', () => {
@@ -91,7 +92,7 @@ describe('paint fan-out', () => {
     expect(registry.get('PAINT_Living_East')?.currentHex).toBe(original);
     expect(store.current).toEqual({});
     expect(changes).toHaveLength(1);
-    expect([...changes[0].colors]).toEqual([['PAINT_Living_East', original]]);
+    expect([...must(changes[0]).colors]).toEqual([['PAINT_Living_East', original]]);
     // Undoing one wall deviates from the saved scheme exactly as painting it does.
     expect(store.activeSchemeId).toBeNull();
   });
@@ -108,11 +109,13 @@ describe('paint fan-out', () => {
     expect(store.current).toEqual({});
     expect(store.activeSchemeId).toBeNull();
     expect(changes).toHaveLength(1);
-    expect([...changes[0].colors.keys()].toSorted()).toEqual([
+    expect([...must(changes[0]).colors.keys()].toSorted()).toEqual([
       'PAINT_Ceiling',
       'PAINT_Living_North',
     ]);
-    expect(changes[0].colors.get('PAINT_Ceiling')).toBe(registry.get('PAINT_Ceiling')?.originalHex);
+    expect(must(changes[0]).colors.get('PAINT_Ceiling')).toBe(
+      registry.get('PAINT_Ceiling')?.originalHex,
+    );
   });
 
   it('says nothing when a write moves nothing', () => {
@@ -131,7 +134,7 @@ describe('paint fan-out', () => {
 describe('schemes', () => {
   it('applies a saved slot, marks it active and reports the hit rate', () => {
     const { registry, store, paint, changes } = setup();
-    store.schemes[0].colors = { PAINT_Living_North: '#aabbcc', PAINT_Nonexistent: '#000000' };
+    must(store.schemes[0]).colors = { PAINT_Living_North: '#aabbcc', PAINT_Nonexistent: '#000000' };
 
     const result = paint.applyScheme('slot-1');
 
@@ -144,8 +147,8 @@ describe('schemes', () => {
     expect(registry.get('PAINT_Living_North')?.currentHex).toBe('#aabbcc');
     expect(store.activeSchemeId).toBe('slot-1');
     expect(changes).toHaveLength(1);
-    expect([...changes[0].colors]).toEqual([['PAINT_Living_North', '#aabbcc']]);
-    expect(changes[0].schemes).toEqual({ schemes: store.schemes, activeId: 'slot-1' });
+    expect([...must(changes[0]).colors]).toEqual([['PAINT_Living_North', '#aabbcc']]);
+    expect(must(changes[0]).schemes).toEqual({ schemes: store.schemes, activeId: 'slot-1' });
     // The whole visible scene is persisted, not just the walls the slot names.
     expect(Object.keys(store.current).toSorted()).toEqual(
       registry
@@ -173,12 +176,12 @@ describe('schemes', () => {
 
     expect(paint.capture('slot-2')).toBe(store.schemes[1]);
 
-    expect(store.schemes[1].colors.PAINT_Living_North).toBe('#aabbcc');
+    expect(must(store.schemes[1]).colors['PAINT_Living_North']).toBe('#aabbcc');
     expect(store.activeSchemeId).toBe('slot-2');
     expect(changes).toHaveLength(1);
     // No wall moved — but the slot's swatches did, so the rows still re-render.
-    expect(changes[0].colors.size).toBe(0);
-    expect(changes[0].schemes).toEqual({ schemes: store.schemes, activeId: 'slot-2' });
+    expect(must(changes[0]).colors.size).toBe(0);
+    expect(must(changes[0]).schemes).toEqual({ schemes: store.schemes, activeId: 'slot-2' });
 
     expect(paint.capture('nope')).toBeNull();
     expect(changes).toHaveLength(1);

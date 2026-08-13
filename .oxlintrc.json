@@ -21,6 +21,13 @@
     {
       "files": ["scripts/**", "test/fixtures/**"],
       "env": { "node": true, "browser": false }
+    },
+    {
+      "files": ["src/**"],
+      "rules": {
+        "typescript/no-non-null-assertion": "error",
+        "typescript/no-explicit-any": "error"
+      }
     }
   ]
 }

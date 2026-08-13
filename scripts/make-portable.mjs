@@ -25,14 +25,16 @@ const scriptMatch = html.match(
   /<script type="module"[^>]*src="\.\/(assets\/[^"]+\.js)"[^>]*><\/script>/,
 );
 const styleMatch = html.match(/<link rel="stylesheet"[^>]*href="\.\/(assets\/[^"]+\.css)"[^>]*>/);
-if (!scriptMatch || !styleMatch) {
+const scriptPath = scriptMatch?.[1];
+const stylePath = styleMatch?.[1];
+if (!scriptPath || !stylePath) {
   throw new Error(
     'Could not find the entry script/stylesheet in dist/index.html — did the build run?',
   );
 }
 
-let js = await readFile(resolve(dist, scriptMatch[1]), 'utf8');
-const css = await readFile(resolve(dist, styleMatch[1]), 'utf8');
+let js = await readFile(resolve(dist, scriptPath), 'utf8');
+const css = await readFile(resolve(dist, stylePath), 'utf8');
 
 // Sourcemap pointer would 404 from an inline script; drop it.
 js = js.replace(/\/\/# sourceMappingURL=.*$/m, '');

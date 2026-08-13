@@ -27,12 +27,14 @@ const MB = 1024 * 1024;
  * by default — the point of the app is judging colour, not fiddling with
  * exposure.
  */
+type InfoKey = 'geometry' | 'textures' | 'compression' | 'baked' | 'lights';
+
 export class DebugPanel {
   private gui: GUI;
   private stats: Stats;
   private visible = false;
   private proxy: Record<string, unknown>;
-  private infoControllers: { name: string; get: () => string }[] = [];
+  private infoControllers: { name: InfoKey; get: () => string }[] = [];
 
   constructor(private hooks: DebugHooks) {
     this.gui = new GUI({ title: 'Debug  ·  ` to hide', width: 300 });
@@ -138,14 +140,14 @@ export class DebugPanel {
 
   private buildScene(): void {
     const folder = this.gui.addFolder('Scene');
-    const info = {
+    const info: Record<InfoKey, string> = {
       geometry: '—',
       textures: '—',
       compression: '—',
       baked: '—',
       lights: '—',
     };
-    for (const key of Object.keys(info) as (keyof typeof info)[]) {
+    for (const key of Object.keys(info) as InfoKey[]) {
       folder.add(info, key).name(key).disable().listen();
     }
     this.infoControllers = [
@@ -158,7 +160,7 @@ export class DebugPanel {
     // lil-gui `.listen()` polls the object, so refresh it on a slow timer.
     setInterval(() => {
       for (const item of this.infoControllers) {
-        (info as Record<string, string>)[item.name] = item.get();
+        info[item.name] = item.get();
       }
     }, 500);
 

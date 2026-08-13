@@ -1,6 +1,7 @@
-import { Mesh, Object3D, Vector3, type Material, type Texture } from 'three';
+import { Object3D, Vector3, type Texture } from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { createGLTFLoader } from './loaders.ts';
+import { isMesh, isTexture, materialsOf } from './materials.ts';
 import { processScene } from './processScene.ts';
 import { createFallbackScene, FALLBACK_KEY, FALLBACK_LABEL } from './fallbackScene.ts';
 import type { LoadedScene } from '../types.ts';
@@ -12,15 +13,12 @@ export type ProgressFn = (fraction: number, label: string) => void;
 export function disposeSubtree(root: Object3D): void {
   const textures = new Set<Texture>();
   root.traverse((obj) => {
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry?.dispose();
-    const materials: Material[] = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const mat of materials) {
+    if (!isMesh(obj)) return;
+    obj.geometry?.dispose();
+    for (const mat of materialsOf(obj)) {
       if (!mat) continue;
       for (const value of Object.values(mat)) {
-        const tex = value as Texture | null;
-        if (tex && (tex as Texture).isTexture) textures.add(tex);
+        if (isTexture(value)) textures.add(value);
       }
       mat.dispose();
     }
@@ -35,7 +33,13 @@ function readFile(file: File, onProgress: ProgressFn): Promise<ArrayBuffer> {
     reader.addEventListener('progress', (e) => {
       if (e.lengthComputable) onProgress((e.loaded / e.total) * 0.5, 'Reading file…');
     });
-    reader.addEventListener('load', () => resolve(reader.result as ArrayBuffer));
+    reader.addEventListener('load', () => {
+      // `readAsArrayBuffer` guarantees an ArrayBuffer result, but check it
+      // rather than assert it — a null result rejects instead of exploding
+      // downstream in the GLTF parser.
+      if (reader.result instanceof ArrayBuffer) resolve(reader.result);
+      else reject(new Error('Could not read file'));
+    });
     reader.addEventListener('error', () =>
       reject(reader.error ?? new Error('Could not read file')),
     );
