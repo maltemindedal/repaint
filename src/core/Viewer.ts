@@ -71,6 +71,8 @@ export class Viewer {
     this.resize();
     window.addEventListener('resize', this.resize);
     if (typeof ResizeObserver !== 'undefined') {
+      // Held in a field, not a local: the observer has no other owner, and an
+      // observation alone is a weak claim to keep one alive.
       this.resizeObserver = new ResizeObserver(this.resize);
       this.resizeObserver.observe(canvas.parentElement ?? canvas);
     }
@@ -143,11 +145,6 @@ export class Viewer {
       this.renderer.render(this.scene, this.camera);
     };
     this.rafId = requestAnimationFrame(tick);
-  }
-
-  stop(): void {
-    if (this.rafId) cancelAnimationFrame(this.rafId);
-    this.rafId = 0;
   }
 
   private trackFps(dt: number): void {
