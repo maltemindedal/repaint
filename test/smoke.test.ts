@@ -100,6 +100,19 @@ describe('material discovery', () => {
     expect(registry.get('Floor_Oak')?.auto).toBe(false);
   });
 
+  it('refreshes its sorted views after a re-discovery', () => {
+    const { root, registry } = buildScene();
+    // Read both first: they are cached per discovery, so this is what a stale
+    // cache would go on serving.
+    expect(registry.list().map((t) => t.key)).not.toContain('Floor_Oak');
+    expect(registry.allMaterials().find((m) => m.name === 'Floor_Oak')?.isPaintable).toBe(false);
+
+    registry.discover(root, { tagged: ['Floor_Oak'] });
+
+    expect(registry.list().map((t) => t.key)).toContain('Floor_Oak');
+    expect(registry.allMaterials().find((m) => m.name === 'Floor_Oak')?.isPaintable).toBe(true);
+  });
+
   it('resolves a raycast hit back to its target', () => {
     const { root, registry } = buildScene();
     const wall = root.children.find(

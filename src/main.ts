@@ -2,12 +2,13 @@ import './style.css';
 import { Viewer } from './core/Viewer.ts';
 import { SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
-import { PaintController, type PaintChange } from './core/PaintController.ts';
+import { PaintController } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
 import { SceneSession } from './core/SceneSession.ts';
 import { NavigationController } from './nav/NavigationController.ts';
 import { AppStore } from './state/store.ts';
 import { Sidebar } from './ui/Sidebar.ts';
+import { sidebarViewModel } from './sidebarViewModel.ts';
 import { Toolbar } from './ui/Toolbar.ts';
 import { DropZone } from './ui/DropZone.ts';
 import { DebugPanel } from './ui/DebugPanel.ts';
@@ -21,14 +22,7 @@ import {
   requireElement,
   pickFile,
 } from './util/dom.ts';
-import type {
-  AppliedSettingKey,
-  LoadedScene,
-  NavMode,
-  PaintTarget,
-  SchemeView,
-  SceneSettings,
-} from './types.ts';
+import type { AppliedSettingKey, LoadedScene, NavMode, SceneSettings } from './types.ts';
 
 class App {
   private viewer: Viewer;
@@ -46,6 +40,7 @@ class App {
   private help: HelpOverlay;
 
   private selectedKey: string | null = null;
+  private hoveredKey: string | null = null;
   private perfChecked = false;
   private loadedAt = 0;
 
@@ -68,7 +63,7 @@ class App {
       },
       {
         applySettings: () => this.applyStoredSettings(),
-        targetsChanged: (targets) => this.renderTargets(targets),
+        targetsChanged: () => this.targetsChanged(),
       },
     );
 
@@ -82,7 +77,7 @@ class App {
       onSaveToLibrary: (hex) => this.saveToLibrary(hex),
       onRemoveLibraryColor: (id) => {
         this.store.removeLibraryColor(id);
-        this.renderLibrary();
+        this.render();
       },
       onRenameLibraryColor: (id, name) => this.store.renameLibraryColor(id, name),
       onApplyLibraryColor: (id) => this.applyLibraryColor(id),
@@ -90,7 +85,7 @@ class App {
       onCaptureScheme: (id) => this.captureScheme(id),
       onRenameScheme: (id, name) => {
         this.store.renameScheme(id, name);
-        this.renderSchemes();
+        this.render();
       },
       onExportData: () => this.exportData(),
       onImportData: () => void this.importData(),
@@ -112,9 +107,15 @@ class App {
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
-    this.paint.onPaintChanged = (change) => this.renderPaintChange(change);
+    // PaintController owns the writes and only emits when something actually
+    // moved; both views work out what that means for the DOM themselves, so
+    // there is nothing here to unpack.
+    this.paint.onPaintChanged = () => this.render();
 
-    this.picker.onHover = (target) => this.sidebar.setHovered(target?.key ?? null);
+    this.picker.onHover = (target) => {
+      this.hoveredKey = target?.key ?? null;
+      this.render();
+    };
     this.picker.onSelect = (target) => this.select(target?.key ?? null);
     this.picker.onDoubleClick = (point) => this.nav.focusPoint(point);
 
@@ -206,40 +207,26 @@ class App {
 
     this.session.load(scene);
 
-    this.sidebar.setFileLabel(scene.label);
-    this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.renderSchemes();
-    this.renderLibrary();
+    // `load` renders through the targetsChanged hook; this picks up the rest of
+    // the panel — file label, materials, library — in the same one call.
+    this.render();
 
     if (!scene.isFallback && this.registry.size === 0) {
       this.panel.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
     }
   }
 
-  /** The session's paint targets changed: after a load, a tag, or an import. */
-  private renderTargets(targets: PaintTarget[]): void {
-    this.sidebar.renderPaintTargets(targets, this.store.library);
+  /**
+   * The session's paint targets changed: after a load, a tag, or an import.
+   * Drops a selection the new target list no longer has, then draws — the view
+   * model reads the targets back off the registry itself.
+   */
+  private targetsChanged(): void {
     if (this.selectedKey && !this.registry.get(this.selectedKey)) this.selectedKey = null;
-    this.sidebar.setSelected(this.selectedKey, false);
+    this.render();
   }
 
   // -------------------------------------------------------------- colour
-
-  /**
-   * The single place a paint change reaches the views. Every repaint — picker
-   * drag, library click, scheme, reset — arrives here, so no call site can
-   * update half the UI and leave the other half stale.
-   */
-  private renderPaintChange(change: PaintChange): void {
-    for (const [key, hex] of change.colors) this.sidebar.updateTarget(key, hex);
-
-    const selectedHex = this.selectedKey ? change.colors.get(this.selectedKey) : undefined;
-    if (selectedHex) this.sidebar.syncPicker(selectedHex);
-
-    // Only when the slots or the active one actually moved — a picker drag
-    // fires this dozens of times a second and must not rebuild them.
-    if (change.schemes) this.renderSchemes(change.schemes);
-  }
 
   private resetTarget(key: string): void {
     const target = this.paint.reset(key);
@@ -256,7 +243,7 @@ class App {
 
   private select(key: string | null): void {
     this.selectedKey = key;
-    this.sidebar.setSelected(key);
+    this.render();
     const target = key ? this.registry.get(key) : null;
     if (target) this.picker.selectPulse(target);
   }
@@ -266,8 +253,8 @@ class App {
     const suggested = target ? `${target.displayName} ${hex.toUpperCase()}` : hex.toUpperCase();
     const entry = this.store.addLibraryColor(suggested, hex);
     if (!entry) return;
+    this.render();
     this.sidebar.focusLibraryEntry(entry.id);
-    this.renderLibrary();
     this.panel.status('Saved to library — type a name in the sidebar');
   }
 
@@ -302,26 +289,33 @@ class App {
     this.panel.status(`Saved current colours into “${scheme.name}”`);
   }
 
-  /** Both scheme views, always together. Defaults to whatever the store holds. */
-  private renderSchemes(view?: SchemeView): void {
-    const next: SchemeView = view ?? {
-      schemes: this.store.schemes,
-      activeId: this.store.activeSchemeId,
-    };
-    this.toolbar.renderSchemes(next);
-    this.sidebar.renderSchemes(next);
-  }
+  // -------------------------------------------------------------- views
 
-  private renderLibrary(): void {
-    this.sidebar.renderLibrary(this.store.library);
+  /**
+   * Push current state into both views. Every mutation ends with this one
+   * call rather than a per-call-site list of which panels to refresh — both
+   * views diff against what they already drew, so it stays cheap enough for
+   * a picker drag and a 3D hover.
+   *
+   * The scheme slots are built once and handed to both, so the two panels
+   * can't disagree about which scheme is live.
+   */
+  private render(): void {
+    const vm = sidebarViewModel({
+      scene: this.scene,
+      registry: this.registry,
+      store: this.store,
+      selectedKey: this.selectedKey,
+      hoveredKey: this.hoveredKey,
+    });
+    this.toolbar.renderSchemes(vm.schemes);
+    this.sidebar.render(vm);
   }
 
   private refreshAll(): void {
     this.session.rediscover();
-    this.sidebar.renderMaterials(this.registry.allMaterials());
-    this.renderSchemes();
-    this.renderLibrary();
     this.applyStoredSettings();
+    this.render();
   }
 
   // ------------------------------------------------------------- tagging
@@ -329,8 +323,8 @@ class App {
   private setTag(materialName: string, tagged: boolean): void {
     const info = this.registry.allMaterials().find((m) => m.name === materialName);
     this.store.setTagged(materialName, tagged, info?.auto ?? false);
+    // `rediscover` renders through the targetsChanged hook.
     this.session.rediscover();
-    this.sidebar.renderMaterials(this.registry.allMaterials());
     this.panel.status(
       `${materialName} ${tagged ? 'is now paintable' : 'removed from the paint list'}`,
     );

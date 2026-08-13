@@ -20,6 +20,7 @@ export class Toolbar {
   private walkBtn: HTMLButtonElement;
   private slotsRow = el('div', { class: 'scheme-slots' });
   private toneBtn: HTMLButtonElement;
+  private renderedSlots: string | null = null;
 
   constructor(
     private root: HTMLElement,
@@ -76,7 +77,16 @@ export class Toolbar {
       : 'Tone mapping OFF — on-screen colour matches the hex you typed. Press T for ACES.';
   }
 
+  /**
+   * Rebuilt only when the slots actually differ. The app renders both views
+   * after every mutation, including on each pointermove of a colour drag, and
+   * a slot rebuild per move would be pure churn.
+   */
   renderSchemes({ schemes, activeId }: SchemeView): void {
+    const signature = JSON.stringify([activeId, schemes.map((s) => [s.id, s.name, s.colors])]);
+    if (signature === this.renderedSlots) return;
+    this.renderedSlots = signature;
+
     clear(this.slotsRow);
     schemes.slice(0, 3).forEach((scheme, index) => {
       const colors = Object.values(scheme.colors);

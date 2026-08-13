@@ -155,18 +155,23 @@ export class ColorPicker {
    * the write and at worst clears the scheme selection that caused it.
    */
   showHex(hex: string): void {
-    const parsed = normalizeHex(hex);
-    if (!parsed || parsed === this.currentHex()) return;
-    this.hsv = hexToHsv(parsed);
-    this.sync();
+    // Already on screen. Re-adopting would round-trip through HSV, which throws
+    // away the hue a cursor parked at zero saturation is still holding.
+    if (normalizeHex(hex) === this.currentHex()) return;
+    if (this.adoptHex(hex)) this.sync();
   }
 
   /** A colour chosen *inside* the picker — applies it and tells the app. */
   private pick(hex: string): void {
+    if (this.adoptHex(hex)) this.sync(true);
+  }
+
+  /** False when the text isn't a colour, in which case nothing moves. */
+  private adoptHex(hex: string): boolean {
     const parsed = normalizeHex(hex);
-    if (!parsed) return;
+    if (!parsed) return false;
     this.hsv = hexToHsv(parsed);
-    this.sync(true);
+    return true;
   }
 
   private sync(notify = false, keepInput = false): void {
