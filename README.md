@@ -432,7 +432,8 @@ src/
     materials.ts           Shared material type guards
     fallbackScene.ts       Procedural demo room (also the smoke-test fixture)
   nav/
-    NavigationController.ts  Mode switching, pose save/restore, double-click focus
+    NavigationController.ts  Mode switching, pose save/restore, pointer lock,
+                             double-click focus
     WalkControls.ts          Damped first-person controls; settle-detection for
                              persisting the walk pose after you stop moving
   state/

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Box3, PerspectiveCamera, Vector3 } from 'three';
 import { NavigationController } from '../src/nav/NavigationController.ts';
 import type { CameraPose, NavMode } from '../src/types.ts';
@@ -66,13 +66,17 @@ beforeAll(() => {
 
 const ORBIT_POSE: CameraPose = { position: [4, 2.1, 4], target: [0, 1, 0] };
 const WALK_POSE: CameraPose = { position: [-1, 1.65, 2], target: [-1, 1.65, -1] };
+const EYE_HEIGHT = 1.65;
 
-function setup() {
+const live: NavigationController[] = [];
+
+function buildNav(startPose: CameraPose = ORBIT_POSE) {
   const canvas = new FakeCanvas();
   const camera = new PerspectiveCamera(60, 1.6, 0.1, 100);
   const nav = new NavigationController({ camera, canvas: canvas as unknown as HTMLElement });
+  live.push(nav);
   nav.setBounds(new Box3(new Vector3(-5, 0, -5), new Vector3(5, 2.6, 5)));
-  nav.applyPose(ORBIT_POSE);
+  nav.applyPose(startPose);
 
   // The store, as `App` wires it: the last emitted pose per mode, handed back
   // on the next switch into that mode.
@@ -90,32 +94,62 @@ function setup() {
   return { nav, camera, canvas, emitted, store };
 }
 
-function distance(a: readonly number[], b: readonly number[]): number {
+type Triple = readonly [number, number, number];
+
+function distance(a: Triple, b: Triple): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+/** The pitch a restored pose would reconstruct, in degrees. */
+function pitchOf(pose: CameraPose): number {
+  const dir = new Vector3().fromArray(pose.target).sub(new Vector3().fromArray(pose.position));
+  return (Math.atan2(dir.y, Math.hypot(dir.x, dir.z)) * 180) / Math.PI;
+}
+
 beforeEach(() => {
-  // Controllers from earlier tests are never disposed; drop their listeners so
-  // only the one under test sees a lock change.
-  pointerLockListeners.clear();
   fakeDocument.pointerLockElement = null;
   fakeDocument.exitPointerLockCalls = 0;
 });
 
+afterEach(() => {
+  // Disposing also unhooks the pointer-lock listeners, so a controller from an
+  // earlier test can't see the next one's lock changes.
+  while (live.length > 0) live.pop()!.dispose();
+});
+
 describe('mode switching', () => {
   it('emits the pose that is actually on screen, once', () => {
-    const { nav, emitted } = setup();
+    // Standing high and looking dead level at the far wall.
+    const { nav, camera, emitted } = buildNav({ position: [0, 2.1, 4], target: [0, 2.1, -4] });
 
     nav.switchMode('walk');
 
     expect(nav.mode).toBe('walk');
     expect(emitted).toHaveLength(1);
     expect(emitted[0].mode).toBe('walk');
-    expect(emitted[0].pose).toEqual(nav.getPose());
+
+    // Compare against the camera a frame later — that is what renders. Reading
+    // getPose() back instead would only compare one function against itself.
+    nav.update(1 / 60);
+    expect(emitted).toHaveLength(1);
+    expect(distance(emitted[0].pose.position, camera.position.toArray() as Triple)).toBeLessThan(
+      1e-6,
+    );
+  });
+
+  it('drops to eye height before reporting, so the view does not tilt', () => {
+    const { nav, emitted } = buildNav({ position: [0, 2.1, 4], target: [0, 2.1, -4] });
+
+    nav.switchMode('walk');
+
+    // Pairing the old camera height with a target computed at the new one would
+    // emit a level view as an ~8.5° downward tilt, which a restore then adopts.
+    expect(emitted[0].pose.position[1]).toBeCloseTo(EYE_HEIGHT, 5);
+    expect(pitchOf(emitted[0].pose)).toBeCloseTo(0, 1);
   });
 
   it('emits the restored pose, not the carried-over one', () => {
-    const { nav, emitted } = setup();
+    const { nav, emitted } = buildNav();
 
     nav.switchMode('walk', WALK_POSE);
 
@@ -127,7 +161,7 @@ describe('mode switching', () => {
   });
 
   it("keeps each mode's pose stable across repeated toggles", () => {
-    const { nav, store } = setup();
+    const { nav, store } = buildNav();
     store.set('orbit', ORBIT_POSE);
     store.set('walk', WALK_POSE);
 
@@ -151,7 +185,7 @@ describe('mode switching', () => {
   });
 
   it('stands the camera at eye height when entering walk mode', () => {
-    const { nav, camera } = setup();
+    const { nav, camera } = buildNav();
 
     nav.switchMode('walk');
     nav.update(1 / 60);
@@ -160,7 +194,7 @@ describe('mode switching', () => {
   });
 
   it('ignores a switch to the mode already in effect', () => {
-    const { nav, emitted } = setup();
+    const { nav, emitted } = buildNav();
     let modeChanges = 0;
     nav.onModeChange = () => modeChanges++;
 
@@ -174,7 +208,7 @@ describe('mode switching', () => {
 
 describe('pointer lock', () => {
   it('locks only in walk mode', () => {
-    const { nav, canvas } = setup();
+    const { nav, canvas } = buildNav();
 
     nav.requestPointerLock();
     expect(canvas.pointerLockRequests).toBe(0);
@@ -187,7 +221,7 @@ describe('pointer lock', () => {
   });
 
   it('releases the lock it holds', () => {
-    const { nav } = setup();
+    const { nav } = buildNav();
     nav.switchMode('walk');
     nav.requestPointerLock();
 
@@ -198,7 +232,7 @@ describe('pointer lock', () => {
   });
 
   it('releases the lock when leaving walk mode', () => {
-    const { nav } = setup();
+    const { nav } = buildNav();
     nav.switchMode('walk');
     nav.requestPointerLock();
 

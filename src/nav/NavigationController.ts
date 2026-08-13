@@ -16,8 +16,10 @@ export interface NavHost {
 /**
  * Owns both navigation modes and the hand-off between them.
  *
- * Switching modes never teleports the camera: each controller adopts the other's
- * final transform, so `Tab` is a change of input scheme, not of viewpoint.
+ * A bare switch never teleports the camera: each controller adopts the other's
+ * final transform, so `Tab` is a change of input scheme, not of viewpoint. Only
+ * an explicit `restorePose` moves you — back to where you last stood in the
+ * mode you are entering.
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
@@ -33,8 +35,8 @@ export class NavigationController {
   onModeChange: ((mode: NavMode) => void) | null = null;
   onPoseChange: ((mode: NavMode, pose: CameraPose) => void) | null = null;
 
-  constructor(private viewer: NavHost) {
-    this.orbit = new OrbitControls(viewer.camera, viewer.canvas);
+  constructor(private host: NavHost) {
+    this.orbit = new OrbitControls(host.camera, host.canvas);
     this.orbit.enableDamping = true;
     this.orbit.dampingFactor = 0.075;
     this.orbit.rotateSpeed = 0.55;
@@ -46,7 +48,7 @@ export class NavigationController {
     // Never orbit under the horizon of the target — keeps you out of the floor.
     this.orbit.maxPolarAngle = Math.PI / 2;
 
-    this.walk = new WalkControls(viewer.camera, viewer.canvas);
+    this.walk = new WalkControls(host.camera, host.canvas);
     this.walk.enabled = false;
 
     this.orbit.addEventListener('end', () => this.emitPose());
@@ -76,18 +78,17 @@ export class NavigationController {
       this.walk.enabled = true;
       this.walk.syncFromCamera();
       // Stand at eye height where the camera already is.
-      const eye = this.walk.eye;
-      eye.y = this.floorY + this.walk.eyeHeight;
-      this.viewer.canvas.classList.add('walk-mode');
+      this.walk.standAt(this.floorY);
+      this.host.canvas.classList.add('walk-mode');
     } else {
       this.walk.enabled = false;
       this.walk.exitPointerLock();
       this.orbit.enabled = true;
       // Put the orbit pivot a few metres ahead of where you were looking.
-      const forward = new Vector3(0, 0, -1).applyQuaternion(this.viewer.camera.quaternion);
-      this.orbit.target.copy(this.viewer.camera.position).addScaledVector(forward, 2.5);
+      const forward = new Vector3(0, 0, -1).applyQuaternion(this.host.camera.quaternion);
+      this.orbit.target.copy(this.host.camera.position).addScaledVector(forward, 2.5);
       this.orbit.update();
-      this.viewer.canvas.classList.remove('walk-mode');
+      this.host.canvas.classList.remove('walk-mode');
     }
 
     this.targetAnim = null;
@@ -130,8 +131,8 @@ export class NavigationController {
     const position = new Vector3().fromArray(pose.position);
     const target = new Vector3().fromArray(pose.target);
 
-    this.viewer.camera.position.copy(position);
-    this.viewer.camera.lookAt(target);
+    this.host.camera.position.copy(position);
+    this.host.camera.lookAt(target);
 
     if (this._mode === 'walk') {
       this.walk.setPose(position, target);
@@ -143,7 +144,7 @@ export class NavigationController {
   }
 
   getPose(): CameraPose {
-    const position = this.viewer.camera.position.toArray() as [number, number, number];
+    const position = this.host.camera.position.toArray() as [number, number, number];
     const target =
       this._mode === 'walk'
         ? (this.walk.getTargetPoint().toArray() as [number, number, number])
@@ -175,7 +176,7 @@ export class NavigationController {
     if (this._mode === 'walk') {
       this.walk.setPose(eye, center);
     } else {
-      this.viewer.camera.position.copy(eye);
+      this.host.camera.position.copy(eye);
       this.orbit.target.copy(center);
       this.orbit.update();
     }
@@ -201,7 +202,7 @@ export class NavigationController {
       // Belt-and-braces floor clamp: panning can push the eye below the slab
       // even with maxPolarAngle limited.
       const minY = this.floorY + 0.08;
-      if (this.viewer.camera.position.y < minY) this.viewer.camera.position.y = minY;
+      if (this.host.camera.position.y < minY) this.host.camera.position.y = minY;
     } else {
       this.walk.update(dt);
     }
