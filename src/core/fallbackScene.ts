@@ -15,7 +15,7 @@ import {
 import { LIGHTMAP_INTENSITY } from './processScene.ts';
 
 /**
- * A tiny procedural apartment corner used before you drop a GLB — and as the
+ * A tiny procedural apartment corner used before you drop a GLB and as the
  * fixture for the smoke test. It deliberately mirrors the export convention it
  * documents: `PAINT_` materials with flat base colours, plus a baked-looking
  * lightmap on a second UV channel.
@@ -26,7 +26,7 @@ import { LIGHTMAP_INTENSITY } from './processScene.ts';
 
 const ROOM = { w: 4.2, d: 3.6, h: 2.6 };
 
-/** Soft vertical gradient with corner falloff — reads like a Cycles bake. */
+/** Soft vertical gradient with corner falloff. It resembles a Cycles bake. */
 export function makeBakedGradient(size = 128): Texture {
   const data = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) {
@@ -43,7 +43,7 @@ export function makeBakedGradient(size = 128): Texture {
       const sweep = 0.97 + 0.06 * Math.sin(u * Math.PI);
 
       // Scaled so the brightest point lands near sRGB 0.6 -> linear ~0.32,
-      // which x lightMapIntensity (π) reads as "fully lit" — matching what a
+      // which x lightMapIntensity (π) reads as "fully lit", matching what a
       // real Cycles diffuse bake stores.
       const lum = Math.max(0, Math.min(1, vertical * occlusion * sweep)) * 0.6;
       const i = (y * size + x) * 4;

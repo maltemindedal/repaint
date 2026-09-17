@@ -7,7 +7,7 @@ import { requireElement } from '../util/dom.ts';
  * context nobody can drive.
  *
  * The page itself lives in index.html and is switched on by a media query in
- * style.css, so it is up on first paint — before this bundle parses, and even
+ * style.css, so it is up on first paint. This happens before the bundle parses, and even
  * if it never does. This module only decides whether the app boots, and offers
  * a way past the gate for whatever the media query gets wrong (a touchscreen
  * laptop, a desktop browser in device-emulation mode).
@@ -52,7 +52,7 @@ function setUpGate(start: () => void): void {
     start();
   });
 
-  // Plugging in a mouse — or closing Chrome's device toolbar — flips the query.
+  // Plugging in a mouse, or closing Chrome's device toolbar, flips the query.
   // Boot then rather than leaving a dead page behind.
   matchMedia(TOUCH_ONLY).addEventListener('change', (event) => {
     if (event.matches) return;
@@ -81,6 +81,6 @@ function rememberUnlock(): void {
   try {
     sessionStorage.setItem(UNLOCK_KEY, '1');
   } catch {
-    /* private mode — the unlock just won't survive a reload */
+    /* private mode. The unlock won't survive a reload */
   }
 }

@@ -9,7 +9,7 @@ export const START_CAM_NAME = 'START_CAM';
 export type NavMode = 'orbit' | 'walk';
 
 /**
- * One recolorable surface. Grouped by *material name*, never by mesh name —
+ * One recolorable surface. Grouped by *material name*, never by mesh name.
  * glTF import can hand back several material instances that share a name
  * (three clones a material when a mesh needs a shader variant), so a target
  * owns a list of instances and writes to all of them at once.
@@ -52,7 +52,7 @@ export interface LoadedScene {
   lights: Light[];
   startCam: CameraPose | null;
   startCamFov: number | null;
-  /** Materials wired up with a baked lightmap — the debug intensity sliders. */
+  /** Materials wired up with a baked lightmap. These drive the debug intensity sliders. */
   bakedMaterials: MeshStandardMaterial[];
   /** Materials whose occlusion is ORM-packed: AO-only, no lightmap. */
   aoOnlyMaterials: MeshStandardMaterial[];
@@ -87,7 +87,7 @@ export interface Scheme {
   colors: Record<string, string>;
 }
 
-/** What the scheme renderers need — the slots plus which one is active. */
+/** What the scheme renderers need: the slots and the active slot. */
 export interface SchemeView {
   schemes: Scheme[];
   activeId: string | null;
@@ -108,7 +108,7 @@ export interface SceneSettings {
 /**
  * The settings that are changed by writing the store and re-applying. Eye
  * height is missing on purpose: walk mode moves it (wheel, Q/E, the debug
- * slider) and reports back, so it goes in through navigation instead — see
+ * slider) and reports back, so it goes in through navigation instead. See
  * `nav/WalkMotion.ts`. Excluding it here makes the old double-ownership
  * unrepresentable rather than merely avoided.
  */

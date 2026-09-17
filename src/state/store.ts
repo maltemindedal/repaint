@@ -13,12 +13,12 @@ import { normalizeHex } from '../util/color.ts';
 export const DEFAULT_SETTINGS: SceneSettings = {
   exposure: 1.0,
   toneMapping: true,
-  // π, not 1 — three divides irradiance by π via BRDF_Lambert. See
+  // π, not 1. three divides irradiance by π via BRDF_Lambert. See
   // LIGHTMAP_INTENSITY in core/processScene.ts.
   lightMapIntensity: Math.PI,
   // 0 by default: the same baked texture drives lightMap, so also feeding it
   // into aoMap would multiply the occlusion in twice. Scenes whose occlusion is
-  // ORM-packed (AO-only, no lightmap) get a per-scene default of 1 instead —
+  // ORM-packed (AO-only, no lightmap) get a per-scene default of 1 instead.
   // see SceneSession.applyHeuristicDefaults. See README.
   aoMapIntensity: 0.0,
   envIntensity: 0.25,
@@ -54,7 +54,7 @@ export function emptyScenePrefs(): ScenePrefs {
 /**
  * Single owner of everything persisted. Scene-scoped state is keyed by the
  * dropped file's name; the colour library is global so it follows you between
- * apartments. Writes are debounced — dragging a colour picker fires a lot.
+ * apartments. Writes are debounced because dragging a colour picker fires a lot.
  */
 export class AppStore {
   private data: AppData;
@@ -228,7 +228,7 @@ export class AppStore {
    * Records a guess: writes only when this scene has no choice of its own.
    *
    * `settings` merges the global defaults in, so it can't answer "has the user
-   * decided this?" — only the raw per-scene block can, and that stays in here.
+   * decided this?" Only the raw per-scene block can, and that stays in here.
    */
   setDefaultSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
     if (this.scene.settings[key] !== undefined) return;

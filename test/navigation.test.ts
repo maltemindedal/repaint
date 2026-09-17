@@ -5,7 +5,7 @@ import { NavigationController } from '../src/nav/NavigationController.ts';
 import type { CameraPose, NavMode } from '../src/types.ts';
 
 /**
- * Mode switching as a state transition over a camera — no renderer, no canvas.
+ * Mode switching as a state transition over a camera. No renderer or canvas.
  *
  * `OrbitControls` and `WalkControls` only ever need an event target and a few
  * layout numbers, so a stub element is enough to exercise the real controller
@@ -105,8 +105,8 @@ function pitchOf(pose: CameraPose): number {
 }
 
 beforeEach(() => {
-  // Controllers are never torn down — #6 deleted dispose() as untested fiction
-  // — so drop the listeners by hand; otherwise a controller from an earlier
+  // Controllers are never torn down. #6 deleted dispose() as untested fiction,
+  // so drop the listeners by hand. Otherwise a controller from an earlier
   // test still sees the next one's lock changes.
   pointerLockListeners.clear();
   fakeDocument.pointerLockElement = null;
@@ -124,7 +124,7 @@ describe('mode switching', () => {
     expect(emitted).toHaveLength(1);
     expect(must(emitted[0]).mode).toBe('walk');
 
-    // Compare against the camera a frame later — that is what renders. Reading
+    // Compare against the camera a frame later. That is what renders. Reading
     // getPose() back instead would only compare one function against itself.
     nav.update(1 / 60);
     expect(emitted).toHaveLength(1);
@@ -170,7 +170,7 @@ describe('mode switching', () => {
     expect(distance(store.get('orbit')!.target, ORBIT_POSE.target)).toBeLessThan(1e-6);
     expect(distance(store.get('walk')!.position, WALK_POSE.position)).toBeLessThan(1e-6);
     // Walk stores a look-at point at a fixed distance, so only the direction
-    // round-trips — but it must not rotate.
+    // round-trips, but it must not rotate.
     const look = new Vector3()
       .fromArray(store.get('walk')!.target)
       .sub(new Vector3().fromArray(WALK_POSE.position));

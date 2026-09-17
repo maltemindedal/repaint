@@ -18,7 +18,7 @@ import type { Viewer } from './Viewer.ts';
  *
  * The highlight is an additive nudge to `material.emissive`. That is
  * deliberate: emissive is always present in the standard-material shader, so
- * writing it is a uniform update — unlike toggling a map or a material flag,
+ * writing it is a uniform update. Unlike toggling a map or a material flag,
  * which would invalidate the program cache and stall a frame every time your
  * pointer crossed a wall.
  */
@@ -102,7 +102,7 @@ export class Picker {
   // ------------------------------------------------------------- pointer
 
   private updatePointer(event: PointerEvent | MouseEvent): void {
-    // Under pointer lock there is no cursor — pick down the centre crosshair.
+    // Under pointer lock there is no cursor. Pick down the centre crosshair.
     if (document.pointerLockElement === this.viewer.canvas) {
       this.pointer.set(0, 0);
       return;
@@ -201,7 +201,7 @@ export class Picker {
     for (const mat of state.materials) mat.emissive.copy(this.scratch);
   }
 
-  /** Restores every touched emissive from its own record — safe to call even
+  /** Restores every touched emissive from its own record. It is safe to call even
    *  after the registry has been rebuilt for a different scene. */
   clearHighlights(): void {
     for (const key of this.highlightState.keys()) this.restoreEmissive(key);

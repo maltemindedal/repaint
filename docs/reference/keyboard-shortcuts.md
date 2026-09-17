@@ -15,7 +15,7 @@ same on non-QWERTY layouts.
 | --------------------------------------------------- | ----------------------------------------------------------- |
 | <kbd>Tab</kbd>                                      | Switch orbit ⇄ walk. Never moves the camera.                |
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Walk (walk mode)                                            |
-| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | Walk — same as WASD                                         |
+| <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> | Walk, same as WASD                                          |
 | <kbd>Shift</kbd>                                    | Hold to move 3× faster                                      |
 | <kbd>Q</kbd> / <kbd>E</kbd>                         | Lower / raise eye height, 1.1 m per second held             |
 | <kbd>L</kbd>                                        | Request pointer lock (walk mode only)                       |
@@ -24,12 +24,12 @@ same on non-QWERTY layouts.
 
 ## Colour
 
-| Key                                    | Action                                                                           |
-| -------------------------------------- | -------------------------------------------------------------------------------- |
-| <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Apply scheme slot 1 / 2 / 3                                                      |
-| <kbd>R</kbd>                           | Reset the selected wall to its exported colour                                   |
-| <kbd>T</kbd>                           | Tone mapping on / off — off means the on-screen colour matches the hex literally |
-| <kbd>P</kbd>                           | Save a 2× PNG screenshot                                                         |
+| Key                                    | Action                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Apply scheme slot 1 / 2 / 3                                                     |
+| <kbd>R</kbd>                           | Reset the selected wall to its exported colour                                  |
+| <kbd>T</kbd>                           | Tone mapping on / off. Off means the on-screen colour matches the hex literally |
+| <kbd>P</kbd>                           | Save a 2× PNG screenshot                                                        |
 
 ## Panels
 
@@ -50,8 +50,8 @@ same on non-QWERTY layouts.
 | Double-click          | orbit | Ease the pivot onto the clicked point                        |
 | Drag                  | walk  | Look around                                                  |
 | Scroll                | walk  | Change eye height                                            |
-| Drop `.glb` / `.gltf` | —     | Load a scene                                                 |
-| Drop `.json`          | —     | Import settings                                              |
+| Drop `.glb` / `.gltf` | n/a   | Load a scene                                                 |
+| Drop `.json`          | n/a   | Import settings                                              |
 
 A click is distinguished from the end of a drag by distance: a pointer that moved
 more than 4 px between press and release does not select.
@@ -61,7 +61,7 @@ centre of the screen.
 
 ## Related
 
-- [Configuration](configuration.md) — the debug panel's settings, defaults and
+- [Configuration](configuration.md): the debug panel's settings, defaults and
   ranges.
-- [Judging colour accurately](../guides/judging-colour.md) — why <kbd>T</kbd>
+- [Judging colour accurately](../guides/judging-colour.md): why <kbd>T</kbd>
   matters.

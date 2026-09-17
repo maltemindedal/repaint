@@ -19,14 +19,14 @@ export interface NavHost {
  *
  * A bare switch never teleports the camera: each controller adopts the other's
  * final transform, so `Tab` is a change of input scheme, not of viewpoint. Only
- * an explicit `restorePose` moves you — back to where you last stood in the
+ * an explicit `restorePose` moves you back to where you last stood in the
  * mode you are entering.
  */
 export class NavigationController {
   readonly orbit: OrbitControls;
   /** Walk-mode camera state: ask this what walk mode is doing, and tell it to move. */
   readonly walk: WalkMotion;
-  /** The listeners that drive `walk`. Private — pointer lock is forwarded below. */
+  /** The listeners that drive `walk`. Pointer lock is forwarded below. */
   private readonly walkInput: WalkControls;
 
   private _mode: NavMode = 'orbit';
@@ -49,7 +49,7 @@ export class NavigationController {
     this.orbit.screenSpacePanning = true;
     this.orbit.minDistance = 0.35;
     this.orbit.maxDistance = 60;
-    // Never orbit under the horizon of the target — keeps you out of the floor.
+    // Never orbit under the horizon of the target. This keeps you out of the floor.
     this.orbit.maxPolarAngle = Math.PI / 2;
 
     this.walk = new WalkMotion(host.camera);
@@ -70,7 +70,7 @@ export class NavigationController {
    * Hands control to the other mode and settles the camera in one step.
    *
    * The incoming mode first adopts the outgoing one's transform; `restorePose`
-   * — where this mode was last left — then overrides it. Only the settled pose
+   * where this mode was last left, then overrides it. Only the settled pose
    * is emitted, so a switch never reports the transform carried over from the
    * mode you just left.
    */
@@ -81,7 +81,7 @@ export class NavigationController {
     if (mode === 'walk') {
       this.orbit.enabled = false;
       this.walkInput.enabled = true;
-      // Stands at eye height where the camera already is — walk mode owns that
+      // Stands at eye height where the camera already is. Walk mode owns that
       // arithmetic, so it isn't repeated out here.
       this.walk.syncFromCamera();
       this.host.canvas.classList.add('walk-mode');
@@ -104,7 +104,7 @@ export class NavigationController {
 
   // -------------------------------------------------------- pointer lock
 
-  /** No-op outside walk mode — orbit has no use for a captured pointer. */
+  /** No-op outside walk mode. Orbit has no use for a captured pointer. */
   requestPointerLock(): void {
     this.walkInput.requestPointerLock();
   }

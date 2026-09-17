@@ -145,7 +145,7 @@ class App {
     this.viewer.start();
     this.panel.status('Drop a .glb anywhere to load your apartment. Press ? for shortcuts.', 6000);
 
-    // Console handle for poking at a scene that doesn't behave — see README.
+    // Console handle for poking at a scene that doesn't behave. See README.
     // Dev-only so the production bundle keeps nothing alive that the UI doesn't.
     if (import.meta.env.DEV) {
       window.apt = this;
@@ -181,14 +181,14 @@ class App {
       );
       this.setScene(scene);
       this.panel.status(
-        `${file.name} — ${this.registry.size} paintable ${this.registry.size === 1 ? 'material' : 'materials'}`,
+        `${file.name}: ${this.registry.size} paintable ${this.registry.size === 1 ? 'material' : 'materials'}`,
         5000,
       );
     } catch (err) {
       console.error('[load] failed', err);
       if (location.protocol === 'file:') {
         console.warn(
-          '[load] Running from file:// — browsers block the DRACO/KTX2 decoder fetches there. ' +
+          '[load] Running from file://. Browsers block the DRACO/KTX2 decoder fetches there. ' +
             'If this file is compressed, use the served build (pnpm serve:dist).',
         );
       }
@@ -215,17 +215,17 @@ class App {
     this.session.load(scene);
 
     // `load` renders through the targetsChanged hook; this picks up the rest of
-    // the panel — file label, materials, library — in the same one call.
+    // the panel. The file label, materials, and library update in one call.
     this.render();
 
     if (!scene.isFallback && this.registry.size === 0) {
-      this.panel.status('No PAINT_ materials found — tag them under “All materials”.', 8000);
+      this.panel.status('No PAINT_ materials found. Tag them under "All materials".', 8000);
     }
   }
 
   /**
    * The session's paint targets changed: after a load, a tag, or an import.
-   * Drops a selection the new target list no longer has, then draws — the view
+   * Drops a selection the new target list no longer has, then draws. The view
    * model reads the targets back off the registry itself.
    */
   private targetsChanged(): void {
@@ -262,7 +262,7 @@ class App {
     if (!entry) return;
     this.render();
     this.sidebar.focusLibraryEntry(entry.id);
-    this.panel.status('Saved to library — type a name in the sidebar');
+    this.panel.status('Saved to library. Type a name in the sidebar');
   }
 
   private applyLibraryColor(id: string): void {
@@ -282,25 +282,25 @@ class App {
     const result = this.paint.applyScheme(id);
     if (result.outcome === 'missing') return;
     if (result.outcome === 'empty') {
-      this.panel.status(`“${result.scheme.name}” is empty — use “Save current” to fill it.`, 4000);
+      this.panel.status(`"${result.scheme.name}" is empty. Use "Save current" to fill it.`, 4000);
       return;
     }
     this.panel.status(
-      `${result.scheme.name} — ${result.applied}/${result.requested} colours applied`,
+      `${result.scheme.name}: ${result.applied}/${result.requested} colours applied`,
     );
   }
 
   private captureScheme(id: string): void {
     const scheme = this.paint.capture(id);
     if (!scheme) return;
-    this.panel.status(`Saved current colours into “${scheme.name}”`);
+    this.panel.status(`Saved current colours into "${scheme.name}"`);
   }
 
   // -------------------------------------------------------------- views
 
   /**
    * Push current state into both views. Every mutation ends with this one
-   * call rather than a per-call-site list of which panels to refresh — both
+   * call rather than a per-call-site list of which panels to refresh. Both
    * views diff against what they already drew, so it stays cheap enough for
    * a picker drag and a 3D hover.
    *
@@ -376,7 +376,7 @@ class App {
    * other change runs the other way, through `storeEyeHeight`.
    *
    * `adoptEyeHeight`, not `setEyeHeight`, because this value came *from* the
-   * store — reporting it back would write a height into the prefs of every
+   * store. Reporting it back would write a height into the prefs of every
    * scene merely opened, quietly opting it out of the default for ever.
    */
   private seedEyeHeight(): void {
@@ -395,8 +395,8 @@ class App {
   }
 
   /**
-   * Walk mode is the live owner of eye height while you're in it — the wheel,
-   * Q/E and the debug slider all move it there — and the store is the owner of
+   * Walk mode is the live owner of eye height while you're in it. The wheel,
+   * Q/E and the debug slider all move it there. The store is the owner of
    * the persisted value. This is the seam between them. It writes the store
    * directly rather than going through `setSetting`, which would re-apply every
    * setting on every wheel tick and push the value straight back into the
@@ -412,8 +412,8 @@ class App {
     this.setSetting('toneMapping', next);
     this.panel.status(
       next
-        ? 'ACES filmic tone mapping ON — looks like your Cycles render'
-        : 'Tone mapping OFF — on-screen colour now matches the hex literally',
+        ? 'ACES filmic tone mapping ON. It looks like your Cycles render'
+        : 'Tone mapping OFF. On-screen colour now matches the hex literally',
       4000,
     );
   }
@@ -458,8 +458,8 @@ class App {
     this.toolbar.setMode(mode);
     this.panel.status(
       mode === 'walk'
-        ? 'Walk mode — WASD to move, drag to look, L for pointer lock'
-        : 'Orbit mode — drag to orbit, double-click to set the pivot',
+        ? 'Walk mode. WASD to move, drag to look, L for pointer lock'
+        : 'Orbit mode. Drag to orbit, double-click to set the pivot',
     );
   }
 
@@ -531,7 +531,7 @@ class App {
     this.panel.status('Rendering 2× screenshot…');
     const blob = await this.viewer.screenshot(2);
     if (!blob) {
-      this.panel.status('Screenshot failed — the drawing buffer came back empty.', 4000);
+      this.panel.status('Screenshot failed. The drawing buffer came back empty.', 4000);
       return;
     }
     const filename = `repaint_${slug}_${stamp}.png`;
@@ -588,20 +588,20 @@ class App {
     }
     if (!stats.ktx2 && stats.textureBytes > 128 * 1024 * 1024) {
       lines.push(
-        '  · Textures are uncompressed RGBA. `gltf-transform uastc`/`etc1s` (KTX2) typically cuts VRAM by 4–8×; this app already has the transcoder wired up.',
+        '  · Textures are uncompressed RGBA. `gltf-transform uastc`/`etc1s` (KTX2) typically cuts VRAM by 4 to 8x. This app already has the transcoder wired up.',
       );
     }
     if (stats.textureBytes > 256 * 1024 * 1024) {
-      lines.push('  · Consider halving lightmap resolution — 2K per room is usually plenty.');
+      lines.push('  · Consider halving lightmap resolution. 2K per room is usually plenty.');
     }
     if (stats.meshes > 1500) {
       lines.push(`  · ${stats.meshes} draw calls. Join meshes that share a material in Blender.`);
     }
     console.warn(lines.join('\n'));
-    this.panel.status(`~${fps.toFixed(0)} fps — see the console for compression hints.`, 6000);
+    this.panel.status(`~${fps.toFixed(0)} fps. See the console for compression hints.`, 6000);
   }
 }
 
-// Phones and tablets get the gate in index.html instead — no WebGL context is
+// Phones and tablets get the gate in index.html instead. No WebGL context is
 // created there, so nothing spins up that the device can't drive.
 bootWhenSupported(() => new App());

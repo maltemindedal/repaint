@@ -35,7 +35,7 @@ function readFile(file: File, onProgress: ProgressFn): Promise<ArrayBuffer> {
     });
     reader.addEventListener('load', () => {
       // `readAsArrayBuffer` guarantees an ArrayBuffer result, but check it
-      // rather than assert it — a null result rejects instead of exploding
+      // rather than assert it. A null result rejects instead of exploding
       // downstream in the GLTF parser.
       if (reader.result instanceof ArrayBuffer) resolve(reader.result);
       else reject(new Error('Could not read file'));
@@ -148,7 +148,7 @@ function logSceneReport(scene: LoadedScene, file: File): void {
   );
   console.log(`compression: draco=${stats.draco} meshopt=${stats.meshopt} ktx2=${stats.ktx2}`);
   console.log(`baked lighting detected: ${scene.hasBakedTextures}`);
-  if (scene.startCam) console.log('START_CAM found — using it for the initial view.');
+  if (scene.startCam) console.log('START_CAM found. Using it for the initial view.');
   if (scene.lights.length) console.log(`${scene.lights.length} punctual light(s) in the file.`);
 
   if (size.y > 100 || size.y < 0.5) {

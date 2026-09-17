@@ -9,7 +9,7 @@ const SECTIONS: [string, Entry[]][] = [
       [['Tab'], 'Switch orbit / walk'],
       [['W', 'A', 'S', 'D'], 'Walk (hold Shift to move faster)'],
       [['Q', 'E'], 'Lower / raise eye height (scroll works too)'],
-      [['drag'], 'Look around — click the view first for pointer lock'],
+      [['drag'], 'Look around. Click the view first for pointer lock'],
       [['Esc'], 'Release pointer lock'],
       [['dbl-click'], 'Orbit mode: set the pivot to that point'],
       [['F'], 'Frame the whole scene'],

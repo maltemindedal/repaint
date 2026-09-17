@@ -5,8 +5,8 @@ import { isTypingTarget } from '../util/dom.ts';
  * The input half of walk mode: pointer, wheel and key events become calls on a
  * `WalkMotion`, which holds the camera state.
  *
- * Nothing here reads that state back — the wheel nudges by a delta rather than
- * fetching the height to write it again — so this class stays a translation
+ * Nothing here reads that state back. The wheel nudges by a delta rather than
+ * fetching the height to write it again, so this class stays a translation
  * layer between the DOM and the state machine, and callers with something to
  * ask about walk mode ask the `WalkMotion` directly.
  */

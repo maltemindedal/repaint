@@ -8,7 +8,7 @@ import { sidebarViewModel, type SidebarSources } from '../src/sidebarViewModel.t
 import type { LoadedScene } from '../src/types.ts';
 
 /**
- * No DOM anywhere in this file — that is the point. What the sidebar should be
+ * No DOM anywhere in this file. What the sidebar should be
  * showing is a plain object, so it can be asserted directly, in node, without
  * building a panel to read the answer back out of.
  */
@@ -30,7 +30,7 @@ function sources(overrides: Partial<SidebarSources> = {}): SidebarSources {
 }
 
 describe('sidebar view model', () => {
-  it('is plain data — nothing from three.js leaks into it', () => {
+  it('is plain data. Nothing from three.js leaks into it', () => {
     const vm = sidebarViewModel(sources());
 
     // A structural clone that comes back equal proves there is no Material,
@@ -87,7 +87,7 @@ describe('sidebar view model', () => {
     expect(vm.hoveredKey).toBe('PAINT_Ceiling');
   });
 
-  it('lists every material for tagging, not just the paintable ones', () => {
+  it('lists every material for tagging, including non-paintable ones', () => {
     const vm = sidebarViewModel(sources());
     const names = vm.materials.map((m) => m.name);
 

@@ -1,4 +1,4 @@
-/** Tiny DOM helpers — enough structure to avoid string-concatenating HTML. */
+/** Tiny DOM helpers. They provide enough structure to avoid string-concatenating HTML. */
 
 type Attrs = Record<string, string | number | boolean | EventListener | undefined>;
 

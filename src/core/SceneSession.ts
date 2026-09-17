@@ -10,23 +10,23 @@ import type { CameraPose, LoadedScene, NavMode, PaintTarget } from '../types.ts'
  * Activation is a sequence, not a set: the store slot has to be current before
  * anything reads settings, discovery has to precede the picker, bounds have to
  * precede the pose, and settings have to come last. Those constraints live in
- * `load()` below and nowhere else — a caller loads a scene, it does not
+ * `load()` below and nowhere else. A caller loads a scene, it does not
  * assemble one.
  */
 
-/** The camera knobs activation touches — `Viewer.camera` satisfies this. */
+/** The camera knobs activation touches. `Viewer.camera` satisfies this. */
 export interface SessionCamera {
   fov: number;
   updateProjectionMatrix(): void;
 }
 
-/** What activation needs from the picker — `Picker` satisfies this. */
+/** What activation needs from the picker. `Picker` satisfies this. */
 export interface SessionPicker {
   setScene(root: Object3D): void;
   refreshTargets(): void;
 }
 
-/** What activation needs from navigation — `NavigationController` satisfies this. */
+/** What activation needs from navigation. `NavigationController` satisfies this. */
 export interface SessionNav {
   readonly mode: NavMode;
   setBounds(bounds: Box3): void;
@@ -49,7 +49,7 @@ export interface SceneSessionHooks {
    * is the direction that *reads* the store, and some of what it pushes can
    * answer back. A stored eye height walk mode has to clamp reports the
    * correction straight to `setSetting`, which writes whichever scene is
-   * current — so this cannot run before the incoming scene's slot is.
+   * current. This cannot run before the incoming scene's slot is.
    */
   applySettings(): void;
   /** The paint-target list changed: a load, a manual re-tag, or an import. */
@@ -81,7 +81,7 @@ export class SceneSession {
 
     // Discovery before the picker. The picker builds its highlight bookkeeping
     // from the registry, keyed by material name, and keeps the first instance
-    // it sees for a key — so refreshing it while the registry still describes
+    // it sees for a key. Refreshing it while the registry still describes
     // the previous scene pins *that* scene's material instances under names the
     // new one reuses.
     this.discoverTargets();
@@ -97,7 +97,7 @@ export class SceneSession {
     }
     nav.applyPose(store.getPose(nav.mode) ?? scene.startCam ?? defaultPose(scene.bounds));
 
-    // Last — see `SceneSessionHooks.applySettings`.
+    // Last. See `SceneSessionHooks.applySettings`.
     this.hooks.applySettings();
   }
 
@@ -129,7 +129,7 @@ export class SceneSession {
     // ORM-packed occlusion can't drive a lightmap, so for those materials the
     // AO slider is the whole effect. The global default of 0 (right for
     // lightmapped scenes, where the bake already contains its occlusion) would
-    // silently disable it — give this file a default of 1 instead.
+    // silently disable it. Give this file a default of 1 instead.
     if (scene.aoOnlyMaterials.length > 0) {
       store.setDefaultSetting('aoMapIntensity', 1);
     }
@@ -140,7 +140,7 @@ export class SceneSession {
    *
    * The store is the single record of what was on screen, and this is the
    * single place it is played back. Discovery deliberately restores nothing of
-   * its own — one restore mechanism, not two, so there is no second copy to
+   * its own. Use one restore mechanism so there is no second copy to
    * drift out of agreement with the sidebar.
    */
   private discoverTargets(): void {
@@ -152,7 +152,7 @@ export class SceneSession {
     registry.discover(scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
 
     // Straight to the registry, not through `PaintController`: this reads
-    // *from* the store, so writing back would only re-save it — and drop the
+    // *from* the store, so writing back would only re-save it and drop the
     // active scheme, as if the user had hand-painted every wall.
     for (const [key, hex] of Object.entries(store.currentColors)) registry.setColor(key, hex);
   }

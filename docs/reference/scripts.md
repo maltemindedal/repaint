@@ -33,10 +33,10 @@ at the first.
 
 ## Tests
 
-| Script            | Runs         | Notes                                                                                                                                            |
-| ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm test`       | `vitest run` | The whole suite, in plain node — no browser, no GPU. Per-file breakdown: [architecture/overview.md](../architecture/overview.md#testable-seams). |
-| `pnpm test:watch` | `vitest`     | Watch mode.                                                                                                                                      |
+| Script            | Runs         | Notes                                                                                                                                                              |
+| ----------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test`       | `vitest run` | The whole suite runs in plain node without a browser or GPU. See the per-file breakdown in [architecture/overview.md](../architecture/overview.md#testable-seams). |
+| `pnpm test:watch` | `vitest`     | Watch mode.                                                                                                                                                        |
 
 ## Not a package script
 
@@ -47,12 +47,12 @@ at the first.
 
 ## Toolchain versions
 
-| Tool           | Version           | Pinned by                                                                                               |
-| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------- |
-| Node           | 24.x              | `NODE_VERSION` in `.github/workflows/ci.yml`. No `engines` field enforces it locally.                   |
-| pnpm           | 11.10.0           | `packageManager` in `package.json` — CI reads the version from there rather than pinning it separately. |
-| TypeScript     | ^5.9.2            | `package.json`                                                                                          |
-| Vite           | ^8.2.1            | `package.json`                                                                                          |
-| Vitest         | ^3.2.4            | `package.json`                                                                                          |
-| three.js       | ^0.185.1          | `package.json`                                                                                          |
-| oxlint / oxfmt | ^1.78.0 / ^0.63.0 | `package.json`                                                                                          |
+| Tool           | Version           | Pinned by                                                                                              |
+| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| Node           | 24.x              | `NODE_VERSION` in `.github/workflows/ci.yml`. No `engines` field enforces it locally.                  |
+| pnpm           | 11.10.0           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
+| TypeScript     | ^5.9.2            | `package.json`                                                                                         |
+| Vite           | ^8.2.1            | `package.json`                                                                                         |
+| Vitest         | ^3.2.4            | `package.json`                                                                                         |
+| three.js       | ^0.185.1          | `package.json`                                                                                         |
+| oxlint / oxfmt | ^1.78.0 / ^0.63.0 | `package.json`                                                                                         |

@@ -42,7 +42,7 @@ export interface SidebarViewModel {
   targets: PaintRow[];
   materials: MaterialInfo[];
   library: LibraryColor[];
-  /** Slots and which one is live — the same view the toolbar renders from. */
+  /** Slots and the active slot. This is the same view the toolbar renders from. */
   schemes: SchemeView;
   selectedKey: string | null;
   hoveredKey: string | null;
@@ -66,12 +66,12 @@ interface RowRefs {
  * The right-hand panel: paintable walls, manual material tagging, the colour
  * library, scheme slots and data import/export.
  *
- * One entry point — `render(viewModel)`. It diffs the model against what is on
+ * One entry point, `render(viewModel)`. It diffs the model against what is on
  * screen and touches only what moved, so it is cheap enough for every
  * pointermove of a colour drag: a changed colour rewrites two nodes instead of
  * rebuilding the tree and tearing the open picker out from under the pointer.
  *
- * Data flows one way. The sidebar never writes model state — not even the row
+ * Data flows one way. The sidebar never writes model state, not even the row
  * whose picker the user is dragging. It reports through the callbacks and
  * redraws when the app renders the change back, so no call site has to know
  * which half of an update is already done.
@@ -197,7 +197,7 @@ export class Sidebar {
    * True when a wholesale-rebuilt section has actually moved.
    *
    * The store hands back the same objects on every render and mutates them in
-   * place — renaming a scheme edits the very object the last render saw — so a
+   * place. Renaming a scheme edits the object the last render saw, so a
    * section can only be diffed against a snapshot of its own contents, never
    * against the reference it was handed last time. Names are deliberately left
    * out of the snapshot and written in place instead: they are the one field
@@ -260,7 +260,7 @@ export class Sidebar {
       this.paintBody.appendChild(
         el('div', { class: 'sb-empty' }, [
           el('span', {
-            html: 'No <code>PAINT_</code> materials found. Open <b>All materials</b> below and tick the ones you want to repaint — the choice is remembered for this file.',
+            html: 'No <code>PAINT_</code> materials found. Open <b>All materials</b> below and tick the ones you want to repaint. The choice is remembered for this file.',
           }),
         ]),
       );
@@ -312,7 +312,7 @@ export class Sidebar {
     if (!refs) return;
     refs.row.classList.add('selected');
     // Scroll for a selection the user just made, not for one carried across a
-    // rebuild — that would yank the panel on every re-discovery.
+    // rebuild. That would yank the panel on every re-discovery.
     this.openPicker(refs, !rebuilt);
   }
 
@@ -332,7 +332,7 @@ export class Sidebar {
       originalHex,
       library: this.library,
       // The row is redrawn by the render this change comes back as, not from
-      // here — one writer, so a row can never show a colour the scene doesn't
+      // here. One writer means a row can never show a colour the scene doesn't
       // have. Remembering the hex only keeps that render off an active drag.
       onChange: (hex) => {
         this.pickerHex = hex;
@@ -356,7 +356,7 @@ export class Sidebar {
   }
 
   /**
-   * Push a colour the picker didn't produce — a scheme, a library click, a
+   * Push a colour the picker didn't produce. A scheme, a library click, a
    * reset. Skipped when the hex is the one the picker last emitted, so a drag
    * never has its own value round-tripped back through hex → HSV, which would
    * lose the hue you are holding at zero saturation.
@@ -444,7 +444,7 @@ export class Sidebar {
       this.libraryBody.appendChild(
         el('div', {
           class: 'sb-empty',
-          text: 'Empty. Pick a colour on a wall and press “Save…” to name and keep it.',
+          text: 'Empty. Pick a colour on a wall and press "Save..." to name and keep it.',
         }),
       );
       return;
@@ -534,7 +534,7 @@ export class Sidebar {
   }
 }
 
-/** Renamed elsewhere (an import, another view) — but never under a live caret. */
+/** Renamed elsewhere, such as an import or another view, but never under a live caret. */
 function writeNames(
   inputs: Map<string, HTMLInputElement>,
   entries: { id: string; name: string }[],

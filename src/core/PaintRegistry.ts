@@ -51,7 +51,7 @@ export class PaintRegistry {
   private byMaterial = new Map<MeshStandardMaterial, string>();
   /**
    * material name -> the sRGB hex the GLB shipped with, captured the first time
-   * we see a scene graph — while the materials are still pristine.
+   * we see a scene graph while the materials are still pristine.
    *
    * A re-discovery of the *same* graph (a manual tag toggle, a settings import)
    * runs against materials that already carry the user's paint, so the live
@@ -64,7 +64,7 @@ export class PaintRegistry {
   private scratch = new Color();
 
   // Both sorted views cost an Intl collation per comparison, and both change
-  // only when `discover` runs — but they are read on every sidebar render, so
+  // only when `discover` runs. They are read on every sidebar render, so
   // they are built once per discovery instead.
   private sortedTargets: PaintTarget[] | null = null;
   private sortedMaterials: MaterialInfo[] | null = null;
@@ -77,7 +77,7 @@ export class PaintRegistry {
    * `SceneSession.discoverTargets`.
    *
    * `originalHex` is the one thing the graph can no longer answer for on a
-   * re-discovery — by then the materials wear the user's paint — so it comes
+   * re-discovery. By then the materials wear the user's paint, so it comes
    * from `this.originalHexes`, banked on the way past below.
    */
   discover(root: Object3D, options: DiscoverOptions = {}): void {
@@ -101,7 +101,7 @@ export class PaintRegistry {
           group = { name: mat.name, materials: [], meshes: [], hasColorMap: false };
           this.groups.set(mat.name, group);
           // Bank the shipped colour here, where the material is first seen and
-          // still pristine — and for every material, paintable or not: an
+          // still pristine, and for every material, paintable or not. An
           // untagged one keeps whatever paint it was wearing, so its exported
           // colour has to be on record before it can be tagged again.
           if (!this.originalHexes.has(mat.name)) this.originalHexes.set(mat.name, hexOf(mat.color));
@@ -187,7 +187,7 @@ export class PaintRegistry {
    *
    * `Color.setStyle()` parses the hex as sRGB and converts into three's linear
    * working space, so a pasted `#E8E4DA` renders as that colour (tone mapping
-   * aside — see the README).
+   * aside. See the README).
    *
    * Deliberately does **not** touch `material.needsUpdate`: writing a uniform
    * value never invalidates the program cache key, so recolouring costs a

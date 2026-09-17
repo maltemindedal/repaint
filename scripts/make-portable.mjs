@@ -1,13 +1,13 @@
 /**
- * Builds `dist/repaint.html` — a single self-contained file you can double-click
- * and open straight from Finder, no server needed.
+ * Builds `dist/repaint.html`, a self-contained file that opens directly from
+ * Finder or Explorer without a server.
  *
  * Browsers block ES-module imports of *separate files* on the file:// protocol,
  * but an *inline* module script is fine. So this script takes the normal Vite
  * build and folds the JS bundle and stylesheet into index.html.
  *
  * One caveat, printed at the end: the DRACO and KTX2 decoders are WASM files
- * fetched on demand, and fetch() is blocked on file:// — so compressed GLBs
+ * fetched on demand. Browsers block fetch() on file://, so compressed GLBs
  * need the served build (`pnpm serve:dist`). Uncompressed GLBs (Blender's
  * default export) and meshopt (bundled JS, no fetch) work fully.
  *
@@ -29,7 +29,7 @@ const scriptPath = scriptMatch?.[1];
 const stylePath = styleMatch?.[1];
 if (!scriptPath || !stylePath) {
   throw new Error(
-    'Could not find the entry script/stylesheet in dist/index.html — did the build run?',
+    'Could not find the entry script or stylesheet in dist/index.html. Did the build run?',
   );
 }
 
@@ -53,7 +53,7 @@ const target = resolve(dist, 'repaint.html');
 await writeFile(target, out);
 
 const mb = (Buffer.byteLength(out) / (1024 * 1024)).toFixed(1);
-console.log(`wrote ${target} (${mb} MB) — open it directly, no server needed.`);
+console.log(`wrote ${target} (${mb} MB). Open it directly, no server needed.`);
 console.log(
   'note: DRACO/KTX2-compressed GLBs cannot decode from file:// (WASM fetch is blocked); use `pnpm serve:dist` for those.',
 );

@@ -43,7 +43,7 @@ function isStartCamName(name: string): boolean {
  * Counted per `Texture.source`, not per `Texture`: GLTFLoader hands out a
  * separate Texture instance for every material that references an image, but
  * they share one `source` and therefore one upload. Counting instances would
- * over-report VRAM by the number of materials — and the perf hint reads this
+ * over-report VRAM by the number of materials. The perf hint reads this
  * number.
  */
 function textureBytes(tex: Texture): number {
@@ -58,9 +58,9 @@ function textureBytes(tex: Texture): number {
 /**
  * `lightMap` feeds three's `irradiance`, which `RE_IndirectDiffuse_Physical`
  * then multiplies by `BRDF_Lambert() = albedo / π`. A Cycles *Diffuse* or
- * *Combined* bake stores outgoing radiance for a white surface — i.e. the
- * result you want *before* that division — so reproducing the Blender render
- * needs the π put back. Hence the default intensity, not 1.
+ * *Combined* bake stores outgoing radiance for a white surface. That is the
+ * result you want *before* the division. Reproducing the Blender render
+ * therefore needs the π put back. Hence the default intensity, not 1.
  */
 export const LIGHTMAP_INTENSITY = Math.PI;
 
@@ -90,7 +90,7 @@ function warnOnce(key: string, message: string): void {
  *
  * Blender's glTF exporter has no lightmap slot, so the documented workflow is
  * to plug the bake into the *occlusion* input of a `glTF Material Output` node
- * group — GLTFLoader lands that in `material.aoMap`.
+ * group. GLTFLoader lands that in `material.aoMap`.
  *
  * Two shapes arrive here and they must be handled differently:
  *
@@ -98,7 +98,7 @@ function warnOnce(key: string, message: string): void {
  *    diffuse irradiance, which is exactly what baked lighting is. The texture
  *    is flagged sRGB (a Cycles bake saved as PNG/JPG is sRGB-encoded; reading
  *    it as linear data washes the room out) and both slots point at the *same*
- *    instance — one upload, one colour-space decision — with `aoMapIntensity`
+ *    instance. There is one upload and one colour-space decision, with `aoMapIntensity`
  *    at 0 so the occlusion isn't multiplied in twice.
  *
  *  - **An ORM-packed texture**, where glTF has stuffed occlusion into R and
@@ -124,7 +124,7 @@ function wireBakedTexture(material: MeshStandardMaterial, mesh: Mesh): BakeKind 
       warnOnce(
         `uv1:${material.name}`,
         `[scene] "${material.name}" has a baked texture on TEXCOORD_1 but the mesh has no second UV set. ` +
-          'Falling back to UV0 — re-export with the lightmap UV layer included.',
+          'Falling back to UV0. Re-export with the lightmap UV layer included.',
       );
     } else {
       warnOnce(
@@ -164,7 +164,7 @@ export function processScene(root: Object3D): ProcessResult {
   const seenMaterials = new Set<MeshStandardMaterial>();
   const bakedMaterials = new Set<MeshStandardMaterial>();
   const aoOnlyMaterials = new Set<MeshStandardMaterial>();
-  // Keyed by Texture.source — see textureBytes().
+  // Keyed by Texture.source. See textureBytes().
   const seenSources = new Set<unknown>();
 
   let meshes = 0;

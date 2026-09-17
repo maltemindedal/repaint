@@ -1,5 +1,5 @@
 /**
- * Generates `apartment-fixture.glb` — a stand-in for a Blender export that
+ * Generates `apartment-fixture.glb`, a stand-in for a Blender export that
  * follows the convention the README documents:
  *
  *   · `PAINT_` materials with a flat baseColorFactor and no baseColorTexture
@@ -289,7 +289,7 @@ for (const part of parts) {
       roughnessFactor: 0.9,
     },
     // The lightmap. Blender has no lightmap slot, so the bake rides in on the
-    // occlusion input — exactly what the README tells you to do.
+    // occlusion input, exactly what the README tells you to do.
     occlusionTexture: { index: 0, texCoord: 1, strength: 1 },
   });
 
@@ -349,7 +349,7 @@ const glb = Buffer.concat([header, jsonHeader, jsonChunk, binHeader, binChunk]);
 const out = resolve(here, 'apartment-fixture.glb');
 writeFileSync(out, glb);
 console.log(
-  `wrote ${out} (${(glb.length / 1024).toFixed(1)} kB) — ` +
+  `wrote ${out} (${(glb.length / 1024).toFixed(1)} kB). ` +
     `${meshes.length} meshes, ${materials.length} materials, ` +
     `${materials.filter((m) => m.name.startsWith('PAINT_')).length} paintable`,
 );

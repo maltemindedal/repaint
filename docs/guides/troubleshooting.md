@@ -2,10 +2,10 @@
 
 Start with the two built-in diagnostics:
 
-- **The debug panel** — press <kbd>`</kbd>. Mesh, triangle and texture counts,
+- **The debug panel.** Press <kbd>`</kbd>. Mesh, triangle and texture counts,
   which compression is in use, whether a bake was detected, whether the file has
   punctual lights, plus a live FPS meter.
-- **The console** — every load writes a collapsed `[scene]` report with
+- **The console.** Every load writes a collapsed `[scene]` report with
   dimensions, material and texture counts, compression flags and warnings.
 
 ## Loading
@@ -19,13 +19,13 @@ it instead:
 pnpm serve:dist
 ```
 
-Or build the double-clickable single file with `pnpm build:portable` — see
+Or build the double-clickable single file with `pnpm build:portable`. See
 [Deploying](deploying.md#the-portable-single-file-build).
 
 ### A compressed `.glb` fails to load from the portable file
 
 Draco and KTX2 files cannot decode on `file://`; the app logs a warning when it
-detects the situation. Use the served build for those files — the explanation is
+detects the situation. Use the served build for those files. The explanation is
 in [Deploying](deploying.md#the-portable-single-file-build).
 
 ### "Only .glb / .gltf (or a settings .json) can be dropped here"
@@ -36,7 +36,7 @@ settings rather than a scene.
 ### "No PAINT_ materials found"
 
 Discovery is by **material** name, not mesh name. Open **All materials** in the
-sidebar and tick what you want to paint — that tagging is remembered per file
+sidebar and tick what you want to paint. That tagging is remembered per file
 name. Or re-export with the `PAINT_` prefix; see
 [Preparing a Blender scene](preparing-a-blender-scene.md).
 
@@ -73,7 +73,7 @@ Check `baked` in the debug panel's Scene folder.
 ### The colour on screen doesn't match the hex I typed
 
 Expected. Press <kbd>T</kbd> to turn tone mapping off. Read
-[Judging colour accurately](judging-colour.md) — this is the single most
+[Judging colour accurately](judging-colour.md). This is the single most
 important caveat in the app.
 
 ### Corners look muddy
@@ -86,12 +86,12 @@ so the occlusion is multiplied in twice. Set **AO intensity** to 0.
 Five seconds after a scene loads, if the frame rate is below 45 fps the app logs
 an actionable hint naming the actual cause. It checks, in order:
 
-| Condition                        | Hint                                                                                     |
-| -------------------------------- | ---------------------------------------------------------------------------------------- |
-| No Draco and no meshopt          | Geometry is uncompressed — re-export with Compression, or run `gltf-transform meshopt`   |
-| No KTX2 and textures over 128 MB | Textures are uncompressed RGBA — `gltf-transform uastc`/`etc1s` typically cuts VRAM 4–8× |
-| Textures over 256 MB             | Halve the lightmap resolution — 2K per room is usually plenty                            |
-| Over 1500 meshes                 | That many draw calls; join meshes that share a material in Blender                       |
+| Condition                        | Hint                                                                                    |
+| -------------------------------- | --------------------------------------------------------------------------------------- |
+| No Draco and no meshopt          | Geometry is uncompressed. Re-export with Compression, or run `gltf-transform meshopt`   |
+| No KTX2 and textures over 128 MB | Textures are uncompressed RGBA. `gltf-transform uastc`/`etc1s` typically cuts VRAM 4–8× |
+| Textures over 256 MB             | Halve the lightmap resolution. 2K per room is usually plenty                            |
+| Over 1500 meshes                 | That many draw calls; join meshes that share a material in Blender                      |
 
 The fastest local fix on a Retina display is dropping **Max pixel ratio** to 1 in
 the debug panel. It defaults to 2.
@@ -104,7 +104,7 @@ the debug panel. It defaults to 2.
 synchronously. That is the cause if it ever fails; the app reports
 "the drawing buffer came back empty" rather than saving a blank file.
 
-Screenshots capture the **viewport only** — no sidebar, no toolbar. They render
+Screenshots capture the **viewport only**, with no sidebar or toolbar. They render
 at 2× the on-screen resolution (capped at a device pixel ratio of 4) and download
 as `repaint_<scheme>_<timestamp>.png`.
 
@@ -114,11 +114,11 @@ as `repaint_<scheme>_<timestamp>.png`.
 
 Scene state is keyed by **file name**. Renaming your export starts it fresh, and
 two different files with the same name share state. Export the JSON first if that
-matters — see [Persistence](../reference/persistence.md).
+matters. See [Persistence](../reference/persistence.md).
 
 ### Nothing persists between reloads
 
-The app falls back to in-memory storage when `localStorage` is unavailable —
+The app falls back to in-memory storage when `localStorage` is unavailable.
 Safari private mode has the API but throws on write. State then lasts only for
 the session. Save failures (including quota) are logged as
 `[storage] save failed (quota?)`.
@@ -132,7 +132,7 @@ starting fresh.` in the console.
 ### I get a "Repaint works on a desktop" page
 
 Your device matched `(pointer: coarse) and (hover: none)`. Press **Continue
-anyway** if that is wrong — a touchscreen laptop, or Chrome's device-emulation
+anyway** if that is wrong, such as on a touchscreen laptop or Chrome's device-emulation
 toolbar. The unlock lasts for the browser session. Closing the device toolbar or
 plugging in a mouse also boots the app automatically.
 
@@ -144,5 +144,5 @@ the browser. Click the viewport and try again.
 
 ### I can walk through walls
 
-By design — there is no collision. Movement is clamped to the scene's bounding
+By design. There is no collision. Movement is clamped to the scene's bounding
 box (plus 0.25 m) so you cannot get lost, and nothing else.

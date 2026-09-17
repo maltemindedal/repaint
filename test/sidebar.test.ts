@@ -5,7 +5,7 @@ import { Sidebar, type SidebarCallbacks, type SidebarViewModel } from '../src/ui
 import type { Scheme } from '../src/types.ts';
 
 /**
- * The sidebar has one entry point — `render(viewModel)` — so its whole
+ * The sidebar has one entry point, `render(viewModel)`, so its whole
  * behaviour is reachable from a plain object plus a DOM. These tests pin the
  * two properties the single entry point exists to guarantee: a render only
  * touches what actually changed (so it is safe on every pointermove of a
@@ -171,7 +171,7 @@ describe('Sidebar colour picker', () => {
     expect(ui.picker()).toBeNull();
   });
 
-  it('survives a colour change — a rebuild mid-drag would tear it out', () => {
+  it('survives a colour change. A rebuild mid-drag would tear it out', () => {
     const ui = mount(selected('#111111'));
     const before = ui.picker();
 
@@ -244,7 +244,7 @@ describe('Sidebar schemes and library', () => {
     const second = must(ui.libraryNames()[1]);
 
     // The first entry's rename is committed; the user has tabbed on and is
-    // half-way through the second. Any render at all — a 3D hover is enough.
+    // half-way through the second. Any render at all, including a 3D hover, is enough.
     must(library[0]).name = 'Chalk white';
     second.focus();
     second.value = 'Linen w';

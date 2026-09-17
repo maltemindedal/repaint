@@ -6,7 +6,7 @@ export interface ColorPickerOptions {
   hex: string;
   originalHex: string;
   library: LibraryColor[];
-  /** Fires continuously while dragging — cheap, it's one uniform write. */
+  /** Fires continuously while dragging. It is cheap because it is one uniform write. */
   onChange: (hex: string) => void;
   onSaveToLibrary: (hex: string) => void;
   onReset: () => void;
@@ -74,7 +74,7 @@ export class ColorPicker {
       this.libRow,
       el('div', {
         class: 'picker-hint',
-        text: 'Paste any text containing a hex — “Alcro Lammull #E8E4DA” works.',
+        text: 'Paste any text containing a hex. "Alcro Lammull #E8E4DA" works.',
       }),
     ]);
 
@@ -132,7 +132,7 @@ export class ColorPicker {
     this.libRow.replaceChildren();
     if (library.length === 0) {
       this.libRow.appendChild(
-        el('div', { class: 'picker-hint', text: 'Library is empty — “Save…” adds this colour.' }),
+        el('div', { class: 'picker-hint', text: 'Library is empty. "Save..." adds this colour.' }),
       );
       return;
     }
@@ -149,7 +149,7 @@ export class ColorPicker {
   }
 
   /**
-   * Shows a colour that has already been applied elsewhere — a scheme, the
+   * Shows a colour that has already been applied elsewhere, such as a scheme or the
    * sidebar library, a reset. Silent on purpose: notifying here would push the
    * change back into the paint fan-out that produced it, which at best re-does
    * the write and at worst clears the scheme selection that caused it.
@@ -161,7 +161,7 @@ export class ColorPicker {
     if (this.adoptHex(hex)) this.sync();
   }
 
-  /** A colour chosen *inside* the picker — applies it and tells the app. */
+  /** A colour chosen *inside* the picker. It applies the colour and tells the app. */
   private pick(hex: string): void {
     if (this.adoptHex(hex)) this.sync(true);
   }

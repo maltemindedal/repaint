@@ -1,4 +1,4 @@
-# 0003 — Default lightmap intensity is π
+# 0003: Default lightmap intensity is π
 
 **Status:** Accepted · **Recorded:** 2026-08-13 (retrospectively, from the
 existing implementation)
@@ -7,7 +7,7 @@ existing implementation)
 
 Once a Cycles bake reaches `material.lightMap`
 ([ADR 0002](0002-smuggle-the-lightmap-through-the-occlusion-slot.md)), the obvious
-default intensity is `1` — pass the baked value through unchanged.
+default intensity is `1`. That would pass the baked value through unchanged.
 
 That renders the room noticeably too dark, and the usual response is to crank
 exposure until it looks right, which wrecks the colours the app exists to judge.
@@ -17,7 +17,7 @@ The cause is a unit mismatch:
 - three.js adds the lightmap into `irradiance`, and `RE_IndirectDiffuse_Physical`
   then multiplies that by `BRDF_Lambert() = albedo / π`.
 - A Cycles **Diffuse** or **Combined** bake already stores _outgoing radiance_ for
-  a white surface — that is, the answer **after** the division has notionally
+  a white surface. That is the answer **after** the division has notionally
   happened.
 
 So passing the bake through at intensity 1 divides by π a second time, and the
@@ -46,7 +46,7 @@ differently can still be dialled in.
 - The default looks arbitrary to anyone who hasn't read this. It is the reason
   the constant carries a comment in three places rather than one.
 - It is correct for a **Diffuse (Direct + Indirect, Color unchecked)** or
-  **Combined** bake — the recommended workflow. A bake produced some other way,
+  **Combined** bake, which is the recommended workflow. A bake produced some other way,
   or an AO map, wants a different value; that is what the slider is for.
 - Two settings now encode the same physical assumption (`lightMapIntensity` at π
   and `aoMapIntensity` at 0). Changing one without the other produces a plausible

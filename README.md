@@ -9,12 +9,12 @@ tells you very little about four square metres of wall under your own windows.
 Repaint loads your apartment with its Cycles lighting baked in, lets you recolour
 any wall by hex, and binds whole colour schemes to <kbd>1</kbd> / <kbd>2</kbd> /
 <kbd>3</kbd> so you can A/B them from a fixed viewpoint. Nothing leaves your
-machine — no backend, no uploads, no analytics; your GLB is read with
+machine. No backend, uploads, or analytics are involved. Your GLB is read with
 `FileReader` and stays in the tab.
 
 ## Quick start
 
-Requires **Node 24.x** and **pnpm 11.10.0** (pinned by `packageManager` — run
+Requires **Node 24.x** and **pnpm 11.10.0** (pinned by `packageManager`; run
 `corepack enable`).
 
 ```bash
@@ -32,8 +32,8 @@ pnpm dev
   ➜  Network: use --host to expose
 ```
 
-A browser tab opens on that URL with a small procedurally generated demo room —
-two walls, a ceiling, a floor and a fake baked gradient — so the whole UI is
+A browser tab opens on that URL with a small procedurally generated demo room.
+It has two walls, a ceiling, a floor, and a fake baked gradient, so the whole UI is
 usable before you have an export ready.
 
 Hover a wall, click it, and paste a hex into the sidebar picker. The hex box
@@ -47,13 +47,13 @@ Press <kbd>Tab</kbd> to walk around with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kb
 and <kbd>?</kbd> for every shortcut.
 
 Then drop your own `.glb` anywhere on the window. Each repaintable wall needs its
-own material named with a `PAINT_` prefix — `PAINT_Living_North` appears in the
+own material named with a `PAINT_` prefix. `PAINT_Living_North` appears in the
 sidebar as **Living North**. Materials without the prefix can be ticked by hand
 under **All materials**.
 
 > **Before you trust a colour on screen:** tone mapping is on by default, so an
 > on-screen pixel is _not_ the hex you typed. Press <kbd>T</kbd> to turn it off.
-> Read [Judging colour accurately](docs/guides/judging-colour.md) — the app is
+> Read [Judging colour accurately](docs/guides/judging-colour.md). The app is
 > built to compare colours, not to replace a tester pot.
 
 ### Static build
@@ -66,7 +66,7 @@ pnpm build
 pnpm serve:dist
 ```
 
-`dist/` must be **served**, not opened as `file://` — browsers block ES modules
+`dist/` must be **served**, not opened as `file://`. Browsers block ES modules
 there, so double-clicking `dist/index.html` gives you a blank page. The build uses
 a relative `base`, so it works from a subfolder on any static host.
 
@@ -77,7 +77,7 @@ pnpm build:portable
 ```
 
 That folds everything into a single self-contained `dist/repaint.html`. Draco and
-KTX2 files still need the served build — see
+KTX2 files still need the served build. See
 [Deploying](docs/guides/deploying.md).
 
 ## Documentation
@@ -103,11 +103,11 @@ Full index: **[docs/README.md](docs/README.md)**
 ```text
 src/          The app: rendering core, navigation, persisted state, plain-DOM UI
 test/         Headless node test suite; fixtures/ generates a sample GLB
-scripts/      make-portable.mjs — folds dist/ into one HTML file
+scripts/      make-portable.mjs, which folds dist/ into one HTML file
 docs/         All documentation (see the index above)
 ```
 
-Vanilla three.js, no React — see
+Vanilla three.js, no React. See
 [ADR 0001](docs/architecture/decisions/0001-vanilla-threejs-over-react-three-fiber.md)
 for why.
 
@@ -118,9 +118,9 @@ suite. See [docs/contributing.md](docs/contributing.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Malte Mindedal.
+MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Malte Mindedal.
 
 `package.json` stays `"private": true` so the package is never published to npm
 by accident; that flag says nothing about the licence, which is MIT for the source
-and the docs alike. The runtime dependencies — three.js, lil-gui and stats.js —
+and the docs alike. The runtime dependencies, three.js, lil-gui, and stats.js,
 are MIT too, so a `dist/` or `dist/repaint.html` build carries only MIT code.

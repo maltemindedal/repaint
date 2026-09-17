@@ -1,4 +1,4 @@
-# 0002 — Smuggle the lightmap through the occlusion slot
+# 0002: Smuggle the lightmap through the occlusion slot
 
 **Status:** Accepted · **Recorded:** 2026-08-13 (retrospectively, from the
 existing implementation)
@@ -10,7 +10,7 @@ which means the apartment needs baked lighting from Cycles.
 
 **Blender's glTF exporter has no lightmap slot.** glTF 2.0 core has no lightmap
 concept at all. The exporter does read an **occlusion** input, via a custom node
-group named `glTF Material Output` — a documented Blender feature intended for
+group named `glTF Material Output`, a documented Blender feature intended for
 baked ambient occlusion.
 
 three.js, meanwhile, has both: `material.aoMap` (red channel only, multiplied
@@ -32,7 +32,7 @@ For a **standalone** occlusion texture, `processScene.ts`:
    `aoMapIntensity = 0`.
 
 Step 3 is deliberate: one upload and one colour-space decision, and the
-occlusion is not multiplied in twice — which would give muddy corners.
+occlusion is not multiplied in twice, which would give muddy corners.
 
 ### The ORM exception
 
@@ -40,8 +40,8 @@ glTF may legally pack occlusion (R), roughness (G) and metallic (B) into one
 texture. Driving `lightMap` with that would light the room with the roughness and
 metallic channels.
 
-The app detects the case — GLTFLoader hands each slot its own `Texture` instance,
-but they share one `source` — and then treats the texture as **plain ambient
+The app detects the case. GLTFLoader hands each slot its own `Texture` instance,
+but they share one `source`. The app then treats the texture as **plain ambient
 occlusion**: `aoMapIntensity = 1`, no lightmap, and a console explanation. Scenes
 in that state also get a per-scene default `aoMapIntensity` of 1, since the global
 default of 0 would silently disable the only effect available to them.
@@ -63,12 +63,12 @@ default of 0 would silently disable the only effect available to them.
   explicitly and the app has to detect when they don't.
 - The bake must land on `TEXCOORD_1`. When a mesh claims it but ships no second
   UV set, the app copies `uv` into `uv1` and warns, rather than rendering the wall
-  black — a fallback that exists purely because authors frequently miss this step
+  black. This fallback exists because authors frequently miss this step
   in Blender.
 
 ## See also
 
-- [Baking lighting](../../guides/baking-lighting.md) — the authoring workflow.
+- [Baking lighting](../../guides/baking-lighting.md): the authoring workflow.
 - [Blender manual: baked ambient occlusion](https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html#baked-ambient-occlusion)
-  — the `glTF Material Output` node group this depends on. Source of truth for
+  The `glTF Material Output` node group this depends on is the source of truth for
   the exporter's behaviour; verify against the Blender version you use.

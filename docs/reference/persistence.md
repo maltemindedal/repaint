@@ -1,7 +1,7 @@
 # Persistence: what gets saved
 
 Everything Repaint remembers lives in the browser's `localStorage`, under a
-single key. Nothing is uploaded anywhere — there is no backend, no account and no
+single key. Nothing is uploaded. There is no backend, account or
 analytics.
 
 ## The storage key
@@ -13,8 +13,8 @@ apartment-walkthrough:v1
 That is the pre-rename key, kept as-is so schemes and libraries saved before the
 app was called Repaint still load (`STORAGE_KEY` in `src/state/storage.ts`).
 
-If `localStorage` is unavailable — Safari private mode has the API but throws on
-write — the app transparently falls back to an in-memory store, and state lasts
+If `localStorage` is unavailable, as in Safari private mode where the API throws on
+write, the app falls back to an in-memory store, and state lasts
 only for the session.
 
 ## Scope: per scene, keyed by file name
@@ -35,16 +35,16 @@ Export the JSON first if either would cost you something.
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tagged` / `untagged` | Manual paintable-material tagging. Only the _deviation_ from what `PAINT_` discovery would do is stored, so a re-export that adds the prefix doesn't leave a stale override. |
 | `schemes`             | The three keyboard-addressable slots (`slot-1`…`slot-3`) with their names and colour maps. Older saves with fewer slots are topped up to three on load.                      |
-| `activeSchemeId`      | Which slot is live — used for the screenshot filename.                                                                                                                       |
+| `activeSchemeId`      | Which slot is live. The app uses it for the screenshot filename.                                                                                                             |
 | `current`             | The live colour of every wall, so a reload picks up exactly where you left off.                                                                                              |
 | `poses`               | Last camera pose, stored separately for `orbit` and `walk`.                                                                                                                  |
-| `settings`            | A partial patch over the global defaults — only keys you have actually changed. See [Configuration](configuration.md).                                                       |
+| `settings`            | A partial patch over the global defaults containing only changed keys. See [Configuration](configuration.md).                                                                |
 
 ### Saved globally
 
-| Data      | Notes                                                                                                         |
-| --------- | ------------------------------------------------------------------------------------------------------------- |
-| `library` | The colour library — name and hex per entry. Shared across every scene, so it follows you between apartments. |
+| Data      | Notes                                                                                     |
+| --------- | ----------------------------------------------------------------------------------------- |
+| `library` | The colour library, with a name and hex value per entry. It is shared across every scene. |
 
 ### Stored elsewhere
 
@@ -56,11 +56,11 @@ Export the JSON first if either would cost you something.
 
 Writes are debounced, because dragging a colour picker fires a lot of them.
 
-| Trigger      | Delay                                        |
-| ------------ | -------------------------------------------- |
-| Most changes | 250 ms                                       |
-| Camera poses | 800 ms — they change on every frame you move |
-| `pagehide`   | Immediate flush                              |
+| Trigger      | Delay                                       |
+| ------------ | ------------------------------------------- |
+| Most changes | 250 ms                                      |
+| Camera poses | 800 ms. They change on every frame you move |
+| `pagehide`   | Immediate flush                             |
 
 A pending short-delay save is never postponed by a lazy one. In walk mode the
 pose is only written once the camera has been still for 0.5 s, so walking
@@ -68,8 +68,8 @@ somewhere is persisted rather than saved a hundred times on the way.
 
 ## Export and import
 
-**Data → Export JSON** in the sidebar writes the whole store — every scene,
-plus the global library — to `repaint-YYYY-MM-DD.json`.
+**Data → Export JSON** in the sidebar writes the whole store, including every scene
+and the global library, to `repaint-YYYY-MM-DD.json`.
 
 **Data → Import JSON**, or dropping a `.json` anywhere on the window, merges a
 file back in:
@@ -117,7 +117,7 @@ propagated:
 - Poses need `position` and `target` as three finite numbers each, or the mode is
   dropped.
 - Settings keep only known keys whose values have the expected type. A finite
-  number passes the type check but may still be out of range — `eyeHeight` and
+  number passes the type check but may still be out of range. `eyeHeight` and
   `walkSpeed` are clamped by the modules that own them.
 - Unparseable JSON logs `[storage] could not read saved data, starting fresh.`
   and yields an empty store rather than throwing.

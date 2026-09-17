@@ -73,8 +73,8 @@ export class Toolbar {
     this.toneBtn.textContent = enabled ? 'ACES' : 'Raw';
     this.toneBtn.classList.toggle('danger', !enabled);
     this.toneBtn.title = enabled
-      ? 'ACES filmic tone mapping is ON — colours are film-like, not literal. Press T for raw.'
-      : 'Tone mapping OFF — on-screen colour matches the hex you typed. Press T for ACES.';
+      ? 'ACES filmic tone mapping is ON. Colours are film-like, not literal. Press T for raw.'
+      : 'Tone mapping OFF. On-screen colour matches the hex you typed. Press T for ACES.';
   }
 
   /**
@@ -97,8 +97,8 @@ export class Toolbar {
           {
             class: `scheme-slot${scheme.id === activeId ? ' active' : ''}`,
             title: empty
-              ? `Slot ${index + 1} is empty — use “Save current” in the sidebar`
-              : `Apply “${scheme.name}” (${index + 1})`,
+              ? `Slot ${index + 1} is empty. Use "Save current" in the sidebar`
+              : `Apply "${scheme.name}" (${index + 1})`,
             onclick: () => this.cb.onApplyScheme(scheme.id),
           },
           [

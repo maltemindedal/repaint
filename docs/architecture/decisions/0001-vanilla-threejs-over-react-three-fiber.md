@@ -1,4 +1,4 @@
-# 0001 — Vanilla three.js over React Three Fiber
+# 0001: Vanilla three.js over React Three Fiber
 
 **Status:** Accepted · **Recorded:** 2026-08-13 (retrospectively, from the
 existing implementation)
@@ -14,7 +14,7 @@ not using it needs a reason.
 
 The hot path in this app is narrow and known: a colour write during a colour
 picker drag. That fires on every `pointermove`, and it must stay a uniform
-upload straight to `material.color` — anything that invalidates three.js's
+upload straight to `material.color`. Anything that invalidates three.js's
 program cache stalls a frame.
 
 ## Decision
@@ -49,7 +49,7 @@ than adopting a reconciler:
   discovery rather than per render (the sort is an `Intl` collation, and it was
   the whole cost), and a section is compared against a snapshot of its _own_
   contents, because the store mutates the objects it hands out in place.
-- `sidebar.test.ts` exists largely to hold that diffing honest — 16 tests over
+- `sidebar.test.ts` exists largely to hold that diffing honest. It has 16 tests over
   which sections a render rebuilds, which it leaves standing, and what survives
   an open colour picker.
 - Contributors who know R3F have to learn this codebase's conventions instead.

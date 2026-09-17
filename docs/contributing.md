@@ -15,7 +15,7 @@ right version. The exact toolchain versions, and where each is pinned, are the
 table in [reference/scripts.md § Toolchain versions](reference/scripts.md#toolchain-versions).
 
 pnpm blocks dependency build scripts by default. `pnpm-workspace.yaml` allows
-exactly one — esbuild's postinstall, which unpacks the platform binary Vite and
+exactly one build script, esbuild's postinstall, which unpacks the platform binary Vite and
 Vitest need. If you add a dependency that needs a build step, it goes there
 deliberately.
 
@@ -25,7 +25,7 @@ deliberately.
 pnpm check
 ```
 
-That is `tsc --noEmit && oxlint && oxfmt --check` — the same three checks CI runs,
+That is `tsc --noEmit && oxlint && oxfmt --check`, the same three checks CI runs,
 in one command. Plus:
 
 ```bash
@@ -36,7 +36,7 @@ Full script list: [reference/scripts.md](reference/scripts.md).
 
 ## Tests
 
-The whole suite lives in `test/` and runs in plain node — no browser, no GPU.
+The whole suite lives in `test/` and runs in plain node without a browser or GPU.
 That is a property worth protecting: the core and nav modules it exercises are
 deliberately renderer-free, so the real pipeline runs headlessly. The per-file
 breakdown, and which seams each file pins, is the table in
@@ -48,7 +48,7 @@ breakdown, and which seams each file pins, is the table in
 - New code in the core or nav layers should be testable the same way. If a module
   needs a `WebGLRenderer` to be tested, that is usually a sign the renderer-facing
   part wants separating from the logic.
-- For manual testing against a real glTF file — the loader, the occlusion→lightmap
+- For manual testing against a real glTF file, including the loader and the occlusion-to-lightmap
   rerouting, `TEXCOORD_1`, `START_CAM`:
 
   ```bash
@@ -62,7 +62,7 @@ breakdown, and which seams each file pins, is the table in
 
 Formatting is `oxfmt` (100 columns, single quotes) and linting is `oxlint`
 (`typescript`, `unicorn`, `oxc` and `import` plugins; `correctness` is an error,
-`suspicious` and `perf` are warnings). Both configs are in the repo root — don't
+`suspicious` and `perf` are warnings). Both configs are in the repo root. Don't
 fight them, run `pnpm format`.
 
 Beyond what the tools check, the house style in this codebase is:
@@ -93,7 +93,7 @@ CI runs on every pull request: **Check** (format, lint, typecheck), **Test**, an
 **Build** (which also asserts `dist/repaint.html` was produced). All three must
 pass.
 
-Observed conventions from the history — imperative subject lines, sentence case,
+Observed conventions from the history include imperative subject lines, sentence case,
 often naming the change's shape rather than its files:
 
 ```text
@@ -113,14 +113,14 @@ suggests squash merges.
 
 ## License
 
-The project is MIT — the full text is in [LICENSE](../LICENSE) at the repository
+The project is MIT. The full text is in [LICENSE](../LICENSE) at the repository
 root. By opening a pull request you agree that your contribution ships under that
 licence; there is no CLA. Keep it that way when adding a dependency: everything in
 `dependencies` is MIT today, so a build carries only MIT code.
 
 ## Documentation
 
-Docs live in `docs/` and follow the [Diátaxis](https://diataxis.fr) split —
+Docs live in `docs/` and follow the [Diátaxis](https://diataxis.fr) split into
 tutorial, how-to guides, reference, explanation. Two rules:
 
 - **Every command, path, default and version in the docs must come from the

@@ -12,7 +12,7 @@ behind individual choices lives in [decisions/](decisions/).
 
 ```text
 src/
-  main.ts                  App — wiring, shortcuts, persistence, screenshots
+  main.ts                  App: wiring, shortcuts, persistence, screenshots
   sidebarViewModel.ts      Gathers what the sidebar should show into one plain
                            object; no DOM, so it is directly assertable
   types.ts                 Shared types; PAINT_ prefix and START_CAM name
@@ -45,7 +45,7 @@ scripts/
 ## How a scene becomes _the_ scene
 
 Activation is a sequence, not a set. The constraints live in `SceneSession.load()`
-and nowhere else — a caller loads a scene, it does not assemble one.
+and nowhere else. A caller loads a scene; it does not assemble one.
 
 ```mermaid
 flowchart TD
@@ -56,7 +56,7 @@ flowchart TD
     E --> F["nav.setBounds()"]
     F --> G[camera fov from START_CAM]
     G --> H["nav.applyPose()<br/>saved pose ?? START_CAM ?? default"]
-    H --> I[applySettings — last]
+    H --> I[applySettings, last]
 ```
 
 Why that order:
@@ -70,7 +70,7 @@ Why that order:
 - **Bounds before the pose.** The walk controller clamps an applied pose against
   the bounds, and the previous apartment's box is the wrong one.
 - **Settings last.** This is the direction that _reads_ the store, and some of
-  what it pushes can answer back — a stored eye height that walk mode has to
+  what it pushes can answer back. A stored eye height that walk mode has to
   clamp reports the correction straight back to the store, which writes whichever
   scene is current.
 
@@ -102,20 +102,20 @@ That "only when stale" is what keeps a picker drag cheap: a drag fires a paint p
 `pointermove`, and rebuilding the toolbar's scheme slots each time would undo the
 targeted row update the sidebar just did.
 
-Restoring saved colours after a load is the exception — it goes straight to the
+Restoring saved colours after a load is the exception. It goes straight to the
 registry, because `SceneSession` is _reading_ the store there and has nothing to
 write back.
 
 ## Rendering the panels
 
-The UI is plain DOM, not React — see
+The UI is plain DOM, not React. See
 [ADR 0001](decisions/0001-vanilla-threejs-over-react-three-fiber.md).
 
 The panels do diff, though, because they have to. `Sidebar` takes its whole state
 as one view model and works out what moved; `Toolbar` skips a slot rebuild when
 the schemes are unchanged. That is about 60 lines, not a reconciler, and it
-exists so the app can re-render both panels after _every_ mutation — including on
-each `pointermove` of a drag — instead of each call site remembering which half of
+exists so the app can re-render both panels after _every_ mutation, including on
+each `pointermove` of a drag, instead of each call site remembering which half of
 the UI it was supposed to touch.
 
 Two rules keep it cheap:
@@ -129,7 +129,7 @@ Two rules keep it cheap:
 
 Recolouring writes `material.color` and nothing else. It never touches
 `needsUpdate`, never toggles a material feature, and so never invalidates
-three.js's program cache — a colour change costs one uniform upload, and dragging
+three.js's program cache. A colour change costs one uniform upload, and dragging
 the picker doesn't stutter. There is a unit test asserting `material.version`
 doesn't move across colour changes.
 
@@ -154,12 +154,12 @@ real pipeline headlessly in node.
 | `walk-motion.test.ts`      |    12 | Eye-height ownership                                                                                                                                                                        |
 | `navigation.test.ts`       |     9 | Orbit ⇄ walk hand-off, against a stub DOM                                                                                                                                                   |
 | `paint-controller.test.ts` |     8 | The fan-out against a fake store: which walls each operation reports, and that scheme rows re-render exactly when the slots change and not once more                                        |
-| `viewModel.test.ts`        |     6 | The sidebar view model in plain node — including that nothing from three.js leaks in, and that paint rows are _snapshots_ rather than the registry's live targets                           |
+| `viewModel.test.ts`        |     6 | The sidebar view model in plain node. Nothing from three.js leaks in, and paint rows are _snapshots_ rather than the registry's live targets                                                |
 
 94 tests total. Only `sidebar.test.ts` needs a document; it opts into happy-dom
 with a `@vitest-environment` docblock so the rest of the suite stays in plain node.
 
-Whether `main.ts` then draws both views is browser-side and not covered — the
+Whether `main.ts` then draws both views is browser-side and not covered. The
 sidebar/toolbar seam is the next thing worth deepening.
 
 ## Debugging a live scene
@@ -175,7 +175,7 @@ apt.viewer.renderer.info; // draw calls, geometries, programs
 
 ## Decisions
 
-- [0001 — Vanilla three.js over React Three Fiber](decisions/0001-vanilla-threejs-over-react-three-fiber.md)
-- [0002 — Smuggle the lightmap through the occlusion slot](decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md)
-- [0003 — Default lightmap intensity is π](decisions/0003-default-lightmap-intensity-is-pi.md)
-- [0004 — Scene state keyed by file name](decisions/0004-scene-state-keyed-by-file-name.md)
+- [0001: Vanilla three.js over React Three Fiber](decisions/0001-vanilla-threejs-over-react-three-fiber.md)
+- [0002: Smuggle the lightmap through the occlusion slot](decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md)
+- [0003: Default lightmap intensity is π](decisions/0003-default-lightmap-intensity-is-pi.md)
+- [0004: Scene state keyed by file name](decisions/0004-scene-state-keyed-by-file-name.md)

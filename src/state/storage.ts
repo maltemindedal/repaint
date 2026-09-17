@@ -1,6 +1,6 @@
 import type { AppData } from '../types.ts';
 
-// Historical key from before the app was renamed to Repaint — kept so
+// Historical key from before the app was renamed to Repaint. Keep it so
 // existing saved schemes and libraries survive the rename.
 export const STORAGE_KEY = 'apartment-walkthrough:v1';
 

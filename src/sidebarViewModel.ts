@@ -16,7 +16,7 @@ export interface SidebarSources {
  * Collects everything the sidebar draws into one plain object.
  *
  * Its own module, and free of any DOM, so the question "what should the panel
- * be showing right now?" can be answered — and asserted — without building
+ * be showing right now?" can be answered and asserted without building
  * one. That is the whole point of the sidebar taking a view model.
  *
  * Paint rows are **snapshots**, not the registry's live `PaintTarget`s. The

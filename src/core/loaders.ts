@@ -12,7 +12,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
  * loaders resolve their own WASM through `new URL(…, import.meta.url)`, so Vite
  * emits version-matched copies into `dist/assets` and everything works offline.
  * That is why neither `setDecoderPath()` nor `setTranscoderPath()` is called
- * here — overriding them would mean hand-copying binaries that must stay in
+ * here. Overriding them would mean hand-copying binaries that must stay in
  * lockstep with the installed three version.
  *
  * The loaders are module-level singletons: each one spins up a worker pool, and

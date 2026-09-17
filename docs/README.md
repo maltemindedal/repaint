@@ -7,13 +7,13 @@ New here? Start with [Getting started](getting-started.md), then read
 [Judging colour accurately](guides/judging-colour.md) before you trust anything
 on screen.
 
-## Tutorial — learning by doing
+## Tutorial: learning by doing
 
 | Document                              | What it covers                                                                                                                    | For                                       |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | [Getting started](getting-started.md) | Install, run, paint a wall, save a scheme, walk around. Uses the built-in demo room, so no Blender file needed. About 10 minutes. | Anyone opening the app for the first time |
 
-## How-to guides — one task per page
+## How-to guides: one task per page
 
 | Document                                                         | What it covers                                                                                                | For                                                       |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -23,7 +23,7 @@ on screen.
 | [Deploying](guides/deploying.md)                                 | The static build, the portable single-file build, hosting, and what CI produces                               | Anyone sharing a build with someone else                  |
 | [Troubleshooting](guides/troubleshooting.md)                     | A scene that loads wrong, looks wrong, runs slowly, or won't persist                                          | Anyone stuck                                              |
 
-## Reference — exhaustive and factual
+## Reference: exhaustive and factual
 
 | Document                                              | What it covers                                                                                      | For                                      |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------- |
@@ -32,15 +32,15 @@ on screen.
 | [Persistence](reference/persistence.md)               | The storage key, what is saved per scene vs globally, the export/import JSON format, and validation | Understanding or moving saved state      |
 | [Scripts](reference/scripts.md)                       | Every `package.json` script, what it runs, and toolchain versions                                   | Day-to-day development                   |
 
-## Explanation — understanding the why
+## Explanation: understanding the why
 
-| Document                                                                                                                         | What it covers                                                                                                                  | For                                             |
-| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| [Architecture overview](architecture/overview.md)                                                                                | Components, scene-activation order, how a colour change reaches the GPU and the store, why recolouring is cheap, testable seams | Contributors, and anyone modifying the app      |
-| [ADR 0001 — Vanilla three.js over R3F](architecture/decisions/0001-vanilla-threejs-over-react-three-fiber.md)                    | Why there is no React, and what the hand-written diffing buys                                                                   | Contributors questioning the UI approach        |
-| [ADR 0002 — Lightmap through the occlusion slot](architecture/decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md) | Why baked lighting travels in the occlusion slot, and how ORM-packed textures are handled                                       | Anyone touching the loader or the bake workflow |
-| [ADR 0003 — Default lightmap intensity is π](architecture/decisions/0003-default-lightmap-intensity-is-pi.md)                    | The `BRDF_Lambert` division that makes 1 wrong and π right                                                                      | Anyone who thinks the default looks arbitrary   |
-| [ADR 0004 — Scene state keyed by file name](architecture/decisions/0004-scene-state-keyed-by-file-name.md)                       | Why renames lose state, and why that beats the alternatives                                                                     | Anyone changing persistence                     |
+| Document                                                                                                                        | What it covers                                                                                                                  | For                                             |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [Architecture overview](architecture/overview.md)                                                                               | Components, scene-activation order, how a colour change reaches the GPU and the store, why recolouring is cheap, testable seams | Contributors, and anyone modifying the app      |
+| [ADR 0001: Vanilla three.js over R3F](architecture/decisions/0001-vanilla-threejs-over-react-three-fiber.md)                    | Why there is no React, and what the hand-written diffing buys                                                                   | Contributors questioning the UI approach        |
+| [ADR 0002: Lightmap through the occlusion slot](architecture/decisions/0002-smuggle-the-lightmap-through-the-occlusion-slot.md) | Why baked lighting travels in the occlusion slot, and how ORM-packed textures are handled                                       | Anyone touching the loader or the bake workflow |
+| [ADR 0003: Default lightmap intensity is π](architecture/decisions/0003-default-lightmap-intensity-is-pi.md)                    | The `BRDF_Lambert` division that makes 1 wrong and π right                                                                      | Anyone who thinks the default looks arbitrary   |
+| [ADR 0004: Scene state keyed by file name](architecture/decisions/0004-scene-state-keyed-by-file-name.md)                       | Why renames lose state, and why that beats the alternatives                                                                     | Anyone changing persistence                     |
 
 ## Contributing
 

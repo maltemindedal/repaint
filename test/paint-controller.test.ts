@@ -52,7 +52,7 @@ describe('paint fan-out', () => {
   it('mirrors a wall repaint into the registry, the store and one event', () => {
     const { registry, store, paint, changes } = setup();
 
-    // Not the wall's exported #e8e4da — a write has to actually move it.
+    // Not the wall's exported #e8e4da. A write has to actually move it.
     expect(paint.apply('PAINT_Living_North', '#3a7fd5')?.key).toBe('PAINT_Living_North');
 
     expect(registry.get('PAINT_Living_North')?.currentHex).toBe('#3a7fd5');
@@ -149,7 +149,7 @@ describe('schemes', () => {
     expect(changes).toHaveLength(1);
     expect([...must(changes[0]).colors]).toEqual([['PAINT_Living_North', '#aabbcc']]);
     expect(must(changes[0]).schemes).toEqual({ schemes: store.schemes, activeId: 'slot-1' });
-    // The whole visible scene is persisted, not just the walls the slot names.
+    // The whole visible scene is persisted, not only the walls the slot names.
     expect(Object.keys(store.current).toSorted()).toEqual(
       registry
         .list()
@@ -179,7 +179,7 @@ describe('schemes', () => {
     expect(must(store.schemes[1]).colors['PAINT_Living_North']).toBe('#aabbcc');
     expect(store.activeSchemeId).toBe('slot-2');
     expect(changes).toHaveLength(1);
-    // No wall moved — but the slot's swatches did, so the rows still re-render.
+    // No wall moved, but the slot's swatches did, so the rows still re-render.
     expect(must(changes[0]).colors.size).toBe(0);
     expect(must(changes[0]).schemes).toEqual({ schemes: store.schemes, activeId: 'slot-2' });
 

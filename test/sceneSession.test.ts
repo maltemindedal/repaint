@@ -193,7 +193,7 @@ describe('per-scene defaults', () => {
     const { session, store } = makeHarness();
     const scene = makeScene();
     // ORM-packed occlusion can't drive a lightmap, so the AO slider is the
-    // whole effect there — the global default of 0 would silently disable it.
+    // whole effect there. The global default of 0 would silently disable it.
     session.load({ ...scene, aoOnlyMaterials: [...scene.bakedMaterials] });
 
     expect(store.settings.aoMapIntensity).toBe(1);
@@ -231,7 +231,7 @@ describe('camera pose', () => {
 
     session.load(scene);
 
-    // `nav.mode` is orbit — the walk pose belongs to the other mode.
+    // `nav.mode` is orbit. The walk pose belongs to the other mode.
     expect(nav.poses).toEqual([saved]);
   });
 

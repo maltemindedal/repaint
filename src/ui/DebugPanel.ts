@@ -24,7 +24,7 @@ const MB = 1024 * 1024;
  * lil-gui panel + stats.js meter, hidden behind the backtick key.
  *
  * Every control here changes how the scene *looks*, so it stays out of the way
- * by default — the point of the app is judging colour, not fiddling with
+ * by default. The point of the app is judging colour, not fiddling with
  * exposure.
  */
 type InfoKey = 'geometry' | 'textures' | 'compression' | 'baked' | 'lights';
@@ -201,7 +201,7 @@ export class DebugPanel {
       highlights: settings.highlights,
     });
     // Scrolling or holding Q/E in walk mode lands here every frame. Repainting
-    // a hidden panel is wasted work — it catches up when it's shown.
+    // A hidden panel is wasted work. It catches up when it is shown.
     if (this.visible) this.refreshDisplays();
   }
 

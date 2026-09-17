@@ -23,7 +23,7 @@ export type FrameCallback = (dt: number, elapsed: number) => void;
  *    in three) mean every `Color.setStyle('#rrggbb')` is treated as sRGB and
  *    converted to the linear working space.
  *  - ACES filmic tone mapping is on by default because it matches a Cycles
- *    render far better than no tone mapping — but it is *not* colour accurate.
+ *    render far better than no tone mapping, but it is *not* colour accurate.
  *    Turn it off (Debug panel / `T`) when judging an exact hex.
  */
 export class Viewer {
@@ -83,7 +83,7 @@ export class Viewer {
 
   /**
    * A low-intensity RoomEnvironment so untextured materials keep some
-   * directional life. Kept quiet on purpose — with a baked scene the lightmap
+   * directional light. Kept quiet on purpose. With a baked scene the lightmap
    * should stay dominant.
    */
   initEnvironment(): void {

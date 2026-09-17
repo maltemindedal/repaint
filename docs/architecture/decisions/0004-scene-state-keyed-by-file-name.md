@@ -1,4 +1,4 @@
-# 0004 — Scene state keyed by file name
+# 0004: Scene state keyed by file name
 
 **Status:** Accepted · **Recorded:** 2026-08-13 (retrospectively, from the
 existing implementation)
@@ -12,12 +12,12 @@ wall, two camera poses, and a settings patch.
 
 Something has to identify "this apartment" across reloads. The candidates:
 
-| Key                        | Problem                                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| File name                  | Renames lose state; two unrelated files with the same name collide                                                  |
-| Content hash               | Every re-export from Blender is a new file, so every re-export loses state — the exact moment you most want it kept |
-| Scene/root node name       | Often empty, often just the Blender file name, and not reliably stable                                              |
-| A user-chosen project name | Adds a naming step before the app does anything useful                                                              |
+| Key                        | Problem                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| File name                  | Renames lose state; two unrelated files with the same name collide                                    |
+| Content hash               | Every re-export from Blender is a new file, so every re-export loses state when you most want it kept |
+| Scene/root node name       | Often empty, often just the Blender file name, and not reliably stable                                |
+| A user-chosen project name | Adds a naming step before the app does anything useful                                                |
 
 The dominant workflow is iterating: export `apartment.glb`, look at it, change
 something in Blender, re-export over the same path, drop it in again. Keeping
@@ -28,7 +28,7 @@ schemes across _that_ cycle is the thing that matters.
 Key scene state by the dropped file's name (`LoadedScene.key = file.name`). The
 built-in demo room uses the reserved key `__fallback__`.
 
-The colour library is deliberately **not** scene-scoped — it is global, so a
+The colour library is deliberately **not** scene-scoped. It is global, so a
 saved paint colour follows you between apartments.
 
 ## Consequences
@@ -57,8 +57,8 @@ mitigated in code.
 
 ## Mitigation available today
 
-**Data → Export JSON** writes the entire store — every scene keyed by name, plus
-the global library — to a file. **Import JSON** merges it back, replacing the
+**Data → Export JSON** writes the entire store, including every scene keyed by name
+and the global library, to a file. **Import JSON** merges it back, replacing the
 entry for each incoming file name. That is the escape hatch for a rename, and the
 way to move state between machines or browsers.
 

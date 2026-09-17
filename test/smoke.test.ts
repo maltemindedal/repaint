@@ -19,7 +19,7 @@ import { isMesh, isStandard } from '../src/core/materials.ts';
 import { extractHex, hexToHsv, hsvToHex, normalizeHex } from '../src/util/color.ts';
 
 /**
- * Smoke test over the procedural fallback room — the same scene the app shows
+ * Smoke test over the procedural fallback room. It is the same scene the app shows
  * before you drop a GLB. It exercises the whole non-GPU pipeline: material
  * discovery, the colour write path, schemes, and persistence.
  */
@@ -39,7 +39,7 @@ function materialOf(mesh: Mesh): MeshStandardMaterial {
   return mat;
 }
 
-/** The wall mesh wearing `materialName` — discovery is by material, never mesh. */
+/** The wall mesh wearing `materialName`. Discovery is by material, never mesh. */
 function findWall(root: Object3D, materialName: string): Mesh {
   const wall = root.children.find(
     (c): c is Mesh => isMesh(c) && !Array.isArray(c.material) && c.material.name === materialName,
@@ -204,7 +204,7 @@ describe('colour pipeline', () => {
     // Move the material on behind the registry's back. The registry used to
     // keep its own map of applied colours and push it back over the top here;
     // restoring what was on screen belongs to the store instead, one level up
-    // — see test/sceneSession.test.ts.
+    // See test/sceneSession.test.ts.
     must(registry.get('PAINT_Living_North')!.materials[0]).color.setStyle(
       '#123456',
       SRGBColorSpace,
@@ -239,7 +239,7 @@ describe('colour pipeline', () => {
     const { registry } = buildScene();
     registry.setColor('PAINT_Living_North', '#abcdef');
 
-    // A fresh load brings its own materials — the previous scene's exported
+    // A fresh load brings its own materials. The previous scene's exported
     // colours must not leak into it.
     const other = createFallbackScene();
     const wall = findWall(other, 'PAINT_Living_North');
@@ -317,7 +317,7 @@ describe('persistence', () => {
     store.setDefaultSetting('punctualLights', true);
     expect(store.settings.punctualLights).toBe(true);
 
-    // A guess never overrules a choice — including a choice that happens to
+    // A guess never overrules a choice, including a choice that happens to
     // equal the global default, which `settings` alone could not tell apart.
     store.setSetting('aoMapIntensity', 0);
     store.setDefaultSetting('aoMapIntensity', 1);
@@ -374,7 +374,7 @@ describe('baked-texture wiring', () => {
   });
 
   it('treats ORM-packed occlusion as AO-only, never a lightmap', () => {
-    // A material whose occlusion texture is shared with roughness — the shape
+    // A material whose occlusion texture is shared with roughness. The shape
     // glTF produces when the exporter packs O/R/M into one image.
     const packed = new DataTexture(new Uint8Array(4 * 4 * 4), 4, 4, RGBAFormat);
     packed.needsUpdate = true;

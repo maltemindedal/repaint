@@ -9,7 +9,7 @@ the app can give, and where its honesty ends.
 ## Why the screen isn't showing you your hex
 
 The app defaults to **ACES filmic tone mapping**, because that is what makes a
-three.js view resemble a Cycles render — it rolls off highlights and adds the
+three.js view resemble a Cycles render. It rolls off highlights and adds the
 contrast you expect from a rendered image.
 
 But tone mapping is a non-linear transform applied _after_ lighting. A wall
@@ -29,7 +29,7 @@ a _fully lit_ surface shows the hex you typed.
 still multiplies the colour. In the debug panel (<kbd>`</kbd>), set **Lightmap
 intensity** to `0`and **Environment** to`1`.
 
-At that point you may as well read the sidebar swatch instead — it is the literal
+At that point you may as well read the sidebar swatch instead. It is the literal
 hex on a neutral grey background, with no lighting applied at all.
 
 **3. Trust the grey.** The UI chrome is a deliberately hue-neutral grey ramp
@@ -44,8 +44,8 @@ Stand still. Press <kbd>1</kbd>, <kbd>2</kbd>, <kbd>3</kbd>.
 
 Scheme slots apply a whole set of wall colours instantly from a fixed viewpoint,
 with the lighting, the framing and your eye position all held constant. That
-side-by-side comparison — _is this white warmer than that one, in this room, at
-this time of day_ — is where the tool beats a paint chart, because a paint chart
+That side-by-side comparison, _is this white warmer than that one, in this room, at
+this time of day_, is where the tool beats a paint chart, because a paint chart
 can't show you the colour on four square metres of wall under your own baked
 lighting.
 
@@ -60,8 +60,8 @@ actual wall, and look at them in daylight and at night.
 
 ## Related
 
-- [Configuration reference](../reference/configuration.md) — every debug-panel
+- [Configuration reference](../reference/configuration.md): every debug-panel
   setting, its default and its range.
-- [Baking lighting](baking-lighting.md) — why the lightmap multiplies the way it
+- [Baking lighting](baking-lighting.md): why the lightmap multiplies the way it
   does.
 - [ADR 0003: default lightmap intensity is π](../architecture/decisions/0003-default-lightmap-intensity-is-pi.md).

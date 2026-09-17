@@ -1,7 +1,7 @@
 import { el, requireElement, requireQuery } from '../util/dom.ts';
 
 /**
- * The transient status toast and the loading overlay — all the ephemeral
+ * The transient status toast and the loading overlay. They contain the ephemeral
  * feedback DOM, out of App's way.
  *
  * Both the display timer and the fade timer are tracked: a toast arriving

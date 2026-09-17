@@ -3,7 +3,7 @@
  *
  * Every paint edit has to reach the registry (what's on the GPU), the store
  * (what survives a reload) and the views (rows, swatches, scheme highlights).
- * Doing that by hand at each call site is how the subsets drift apart — so the
+ * Doing that by hand at each call site is how the subsets drift apart. The
  * writes live here, and views learn about them from a single change event.
  */
 
@@ -30,7 +30,7 @@ export interface PaintChange {
 
 export type PaintListener = (change: PaintChange) => void;
 
-/** Why a scheme apply did or didn't happen — the caller only has to phrase it. */
+/** Why a scheme apply did or didn't happen. The caller only has to phrase it. */
 export type ApplySchemeResult =
   | { outcome: 'missing' }
   | { outcome: 'empty'; scheme: Scheme }
@@ -84,7 +84,7 @@ export class PaintController {
 
     const before = this.snapshot();
     const applied = this.registry.applyScheme(scheme.colors);
-    // Persist the whole scene, not just the slot's keys: what you see now is
+    // Persist the whole scene, including keys outside the slot. What you see now is
     // what a reload has to bring back.
     for (const target of this.registry.list()) {
       this.store.setCurrentColor(target.key, target.currentHex);
@@ -108,14 +108,14 @@ export class PaintController {
     return this.store.schemes.find((s) => s.id === id) ?? null;
   }
 
-  /** Moves the active slot. False when it was already there — nothing to re-render. */
+  /** Moves the active slot. False when it was already there, so nothing re-renders. */
   private selectScheme(id: string | null): boolean {
     if (this.store.activeSchemeId === id) return false;
     this.store.setActiveScheme(id);
     return true;
   }
 
-  /** Colours as they stand now — strings, so it survives the writes that follow. */
+  /** Current colours as strings, so they survive the writes that follow. */
   private snapshot(): Map<string, string> {
     return new Map(this.registry.list().map((target) => [target.key, target.currentHex]));
   }

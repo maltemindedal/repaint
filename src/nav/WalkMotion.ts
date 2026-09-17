@@ -15,15 +15,15 @@ const RISE_METRES_PER_SECOND = 1.1;
  * judging a colour needs a stable image, and a camera that eases into place
  * beats one that jitters with every mouse tick.
  *
- * No collision — as specified. Movement is clamped to the scene bounding box
+ * No collision, as specified. Movement is clamped to the scene bounding box
  * (slightly inset) so you can't wander off into the void.
  *
  * There is no DOM here: it is a state machine over held keys, accumulated look
  * deltas and that bounding box, so it can be stepped a frame at a time in a
  * test. `WalkControls` owns the listeners that drive it.
  *
- * Eye height lives here while walk mode runs — the scroll wheel and Q/E both
- * move it — but the module never *owns* the persisted value. Every change
+ * Eye height lives here while walk mode runs. The scroll wheel and Q/E both
+ * move it, but the module never *owns* the persisted value. Every change
  * leaves through `onEyeHeightChange`, so the listener that stores it is always
  * looking at what the user actually did.
  */
@@ -86,7 +86,7 @@ export class WalkMotion {
    * Writes the eye straight back to the camera rather than waiting for the next
    * `update()`: a pose read in between would pair the camera's old height with
    * a target computed from the new one, which is neither what renders nor a
-   * coherent pose to restore — it reconstructs as a downward tilt.
+   * coherent pose to restore. It reconstructs as a downward tilt.
    */
   syncFromCamera(): void {
     this.position.copy(this.camera.position);
@@ -122,7 +122,7 @@ export class WalkMotion {
     return this._eyeHeight;
   }
 
-  /** A change originating here — the owner is told about it. */
+  /** A change originating here. The owner is told about it. */
   setEyeHeight(value: number): void {
     const clamped = MathUtils.clamp(value, EYE_HEIGHT_RANGE.min, EYE_HEIGHT_RANGE.max);
     // Q/E and the wheel keep calling this while held; only real movement is
@@ -138,7 +138,7 @@ export class WalkMotion {
   }
 
   /**
-   * Takes the height the owner already holds — a scene arriving with one of its
+   * Takes the height the owner already holds. A scene arriving with one of its
    * own. Silent when that height was usable: reporting it would be the owner
    * hearing its own value come back as though the user had moved, which is how
    * a scene the user never touched ends up with a stored height of its own.
@@ -146,7 +146,7 @@ export class WalkMotion {
    * When it *wasn't* usable, say so. Storage only checks that a setting is a
    * finite number, so a hand-edited or imported file can carry a height no one
    * can stand at; clamping it in silence would leave the owner holding a value
-   * walk mode refuses — two truths again.
+   * walk mode refuses. This would create two truths again.
    */
   adoptEyeHeight(value: number): void {
     const clamped = MathUtils.clamp(value, EYE_HEIGHT_RANGE.min, EYE_HEIGHT_RANGE.max);

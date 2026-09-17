@@ -23,13 +23,13 @@ Usage:
 Run with `-- --help` for the option list, or see
 docs/guides/baking-lighting.md, "Automating this guide with a script".
 
-The source .blend is never saved — everything happens on the in-memory
+The script never saves the source .blend. It works on the in-memory
 copy. Bake images are packed into the export and also written to
 <out dir>/bakes/ for inspection.
 
 Notes:
   - The scene still needs lights (or a world) to bake, and paintable
-    materials still need the PAINT_ name prefix — a script can't guess
+    materials still need the PAINT_ name prefix. The script can't guess
     which walls you want to repaint.
   - Meshes that already have 2+ UV layers get the lightmap at index 2+,
     not TEXCOORD_1; the script warns when that happens.
@@ -205,7 +205,7 @@ def promote_shared_small(
     bake: list[bpy.types.Object], small: list[bpy.types.Object]
 ) -> list[bpy.types.Object]:
     """The bake image lives on the material, so a small object sharing a
-    material with a baked object must be baked too — otherwise its mesh
+    material with a baked object must be baked too. Otherwise its mesh
     would carry an occlusion texture but no lightmap UV layer."""
     baked_mats = {m for ob in bake for m in materials_of(ob)}
     promoted: list[bpy.types.Object] = []
@@ -236,7 +236,7 @@ def top_level_collection_map() -> dict[str, str]:
 def build_groups(
     objects: Sequence[bpy.types.Object], mode: GroupBy
 ) -> dict[str, list[bpy.types.Object]]:
-    """Group objects, then merge any groups that share a material —
+    """Group objects, then merge any groups that share a material.
     the bake image lives on the material, so a material can only belong
     to one atlas."""
     parent: dict[str, str] = {}
@@ -464,12 +464,12 @@ def main() -> None:
         1 for ob in scene.objects if ob.type == "LIGHT" and not ob.hide_render
     )
     if n_lights == 0 and not world_emits_light(scene.world):
-        log("WARNING: no lights and the world looks dark — "
-            "the bake will probably be black")
+        log("WARNING: no lights and the world looks dark. "
+            "The bake will probably be black")
 
     paint = [m for m in bpy.data.materials if m.name.startswith("PAINT_")]
     log(f"{len(paint)} PAINT_ material(s) found" if paint else
-        "WARNING: no PAINT_ materials — nothing will be repaintable "
+        "WARNING: no PAINT_ materials. Nothing will be repaintable "
         "(you can still tag materials manually in the app)")
 
     objects, small = bakeable_objects(opts.min_size)

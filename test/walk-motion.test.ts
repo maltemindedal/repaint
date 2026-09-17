@@ -6,7 +6,7 @@ import { emptyData, migrate } from '../src/state/storage.ts';
 
 /**
  * Eye height has one owner: whoever listens to `onEyeHeightChange`. These tests
- * pin that contract — every way the height can move must come back out through
+ * pin that contract. Every way the height can move must come back out through
  * the callback, so a listener that persists it never holds a stale value.
  */
 
@@ -102,7 +102,7 @@ describe('eye-height ownership', () => {
 
     expect(motion.eyeHeight).toBe(EYE_HEIGHT_RANGE.max);
     // Staying silent here is what leaves the owner holding 100 while walk mode
-    // stands at 6 — two truths again, which is the whole thing being fixed.
+    // stands at 6. Two truths again, which is the whole thing being fixed.
     expect(reported).toEqual([EYE_HEIGHT_RANGE.max]);
   });
 });
@@ -155,8 +155,8 @@ describe('eye height and the store', () => {
     const crouched = motion.eyeHeight;
     expect(crouched).toBeLessThan(DEFAULT_SETTINGS.eyeHeight);
     expect(camera.position.y).toBe(crouched);
-    // Nothing that re-applies settings afterwards — a tone-mapping toggle, a
-    // debug slider, a scene reload — can stand the user back up, because the
+    // Nothing that re-applies settings afterwards, such as a tone-mapping toggle, a
+    // debug slider, or a scene reload, can stand the user back up, because the
     // value they all read is the one the user just walked to.
     expect(store.settings.eyeHeight).toBe(crouched);
   });
@@ -169,7 +169,7 @@ describe('eye height and the store', () => {
     motion.setEyeHeight(1.2);
     motion.onEyeHeightChange = (value) => store.setSetting('eyeHeight', value);
 
-    // Loading a scene seeds walk mode from that scene's settings — here, from
+    // Loading a scene seeds walk mode from that scene's settings, here from
     // the default, because this scene has none of its own.
     motion.adoptEyeHeight(store.settings.eyeHeight);
 
