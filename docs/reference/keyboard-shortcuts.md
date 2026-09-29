@@ -4,7 +4,9 @@ Press <kbd>?</kbd> in the app for an abbreviated version of this list.
 
 Shortcuts are ignored while you are typing in a text field, and any key pressed
 with <kbd>Cmd</kbd>, <kbd>Ctrl</kbd> or <kbd>Alt</kbd> held is passed through to
-the browser untouched.
+the browser untouched, in walk mode too. Each shortcut fires once per press;
+holding a key does not repeat it (only walking and eye height respond to a held
+key).
 
 Keys are matched by physical position (`KeyboardEvent.code`), so they work the
 same on non-QWERTY layouts.

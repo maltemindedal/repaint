@@ -87,6 +87,10 @@ export class WalkControls {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (isTypingTarget(event.target)) return;
+    // Cmd/Ctrl/Alt chords (Ctrl+S, Cmd+D, Alt+Left for Back...) belong to the
+    // browser: don't walk on them and don't swallow them. Shift is not one of
+    // these; it is the sprint modifier.
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
     this.motion.keys.add(event.code);
     if (this.enabled && MOVE_CODES.has(event.code)) event.preventDefault();
   };

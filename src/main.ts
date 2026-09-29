@@ -481,6 +481,15 @@ class App {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (isTypingTarget(event.target)) return;
 
+    // Every action below is one-shot. A held key auto-repeats, and a repeat of
+    // T, Tab, Backquote or P would flip tone mapping, the mode or the debug panel
+    // over and over, or download many PNGs. Tab and Backquote still need their
+    // default (focus traversal, typing a backtick) suppressed on each repeat.
+    if (event.repeat) {
+      if (event.code === 'Tab' || event.code === 'Backquote') event.preventDefault();
+      return;
+    }
+
     switch (event.code) {
       case 'Tab':
         event.preventDefault();
