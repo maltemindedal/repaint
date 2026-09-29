@@ -1,4 +1,4 @@
-import { GUI } from 'lil-gui';
+import { GUI, type Controller } from 'lil-gui';
 import Stats from 'three/addons/libs/stats.module.js';
 import { EYE_HEIGHT_RANGE } from '../nav/WalkMotion.ts';
 import type { AppliedSettingKey, SceneSettings, SceneStats } from '../types.ts';
@@ -35,6 +35,17 @@ export class DebugPanel {
   private visible = false;
   private proxy: Record<string, unknown>;
   private infoControllers: { name: InfoKey; get: () => string }[] = [];
+  /** The read-only lines that poll their values, one animation-frame loop each. */
+  private polled: Controller[] = [];
+  /** What those lines show; `refreshInfo` fills it while the panel is shown. */
+  private info: Record<InfoKey, string> = {
+    geometry: '—',
+    textures: '—',
+    compression: '—',
+    baked: '—',
+    lights: '—',
+  };
+  private infoTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private hooks: DebugHooks) {
     this.gui = new GUI({ title: 'Debug  ·  ` to hide', width: 300 });
@@ -140,15 +151,9 @@ export class DebugPanel {
 
   private buildScene(): void {
     const folder = this.gui.addFolder('Scene');
-    const info: Record<InfoKey, string> = {
-      geometry: '—',
-      textures: '—',
-      compression: '—',
-      baked: '—',
-      lights: '—',
-    };
+    const info = this.info;
     for (const key of Object.keys(info) as InfoKey[]) {
-      folder.add(info, key).name(key).disable().listen();
+      this.polled.push(folder.add(info, key).name(key).disable());
     }
     this.infoControllers = [
       { name: 'geometry', get: () => this.geometryLine() },
@@ -157,20 +162,15 @@ export class DebugPanel {
       { name: 'baked', get: () => (this.hooks.hasBakedTextures() ? 'yes' : 'no') },
       { name: 'lights', get: () => (this.hooks.hasPunctualLights() ? 'in file' : 'none') },
     ];
-    // Fill them now: the panel is built when it is first opened, and would show
-    // placeholders until the first timer tick otherwise.
-    for (const item of this.infoControllers) info[item.name] = item.get();
-    // lil-gui `.listen()` polls the object, so refresh it on a slow timer.
-    setInterval(() => {
-      for (const item of this.infoControllers) {
-        info[item.name] = item.get();
-      }
-    }, 500);
 
     folder.add({ frame: () => this.hooks.frameScene() }, 'frame').name('Frame scene (F)');
     folder.add({ reset: () => this.hooks.resetColors() }, 'reset').name('Reset all colours');
     folder.add({ log: () => this.hooks.logMaterialReport() }, 'log').name('Log material report');
     folder.close();
+  }
+
+  private refreshInfo(): void {
+    for (const item of this.infoControllers) this.info[item.name] = item.get();
   }
 
   private geometryLine(): string {
@@ -226,7 +226,17 @@ export class DebugPanel {
 
   setVisible(visible: boolean): void {
     this.visible = visible;
-    if (visible) this.refreshDisplays();
+    // Everything that keeps the readouts current runs only while they can be seen,
+    // so a hidden panel wakes a page that is otherwise asleep neither every frame
+    // (lil-gui's `listen()` loops) nor twice a second (the timer that feeds them).
+    if (this.infoTimer) clearInterval(this.infoTimer);
+    this.infoTimer = null;
+    if (visible) {
+      this.refreshInfo();
+      this.infoTimer = setInterval(() => this.refreshInfo(), 500);
+      this.refreshDisplays();
+    }
+    for (const controller of this.polled) controller.listen(visible);
     this.gui.domElement.style.display = visible ? '' : 'none';
     this.stats.dom.style.display = visible ? '' : 'none';
   }
@@ -239,11 +249,9 @@ export class DebugPanel {
 /**
  * The panel is hidden until the backtick key, yet building it costs about 30 ms
  * of main-thread time before the first frame (the fps meter's canvases, lil-gui
- * and its folders) and leaves five animation-frame listeners and a timer running
- * for as long as it exists. This builds it on first use instead. Until then the
- * frame ticks and settings syncs the app sends are no-ops: the panel reads the
- * live settings when it is built, and a hidden one only ever caught up when it was
- * shown anyway.
+ * and its folders). This builds it on first use instead. Until then the frame ticks and settings syncs
+ * the app sends are no-ops: the panel reads the live settings when it is built,
+ * and a hidden one only ever caught up when it was shown anyway.
  */
 export class LazyDebugPanel {
   private panel: DebugPanel | null = null;

@@ -4,9 +4,8 @@ import { DEFAULT_SETTINGS } from '../src/state/store.ts';
 
 /**
  * The debug panel (lil-gui plus the fps meter) is hidden until the backtick key
- * and costs about 30 ms of main-thread time to build, plus five animation-frame
- * listeners and a timer for as long as it exists. `LazyDebugPanel` builds it on
- * first use and makes everything the app does to it in the meantime a no-op.
+ * and costs about 30 ms of main-thread time to build. `LazyDebugPanel` builds it
+ * on first use and makes everything the app does to it in the meantime a no-op.
  */
 function fakePanel() {
   return {
