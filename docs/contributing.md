@@ -19,6 +19,12 @@ exactly one build script, esbuild's postinstall, which unpacks the platform bina
 Vitest need. If you add a dependency that needs a build step, it goes there
 deliberately.
 
+`pnpm-workspace.yaml` also holds two supply-chain guards. `minimumReleaseAge` makes pnpm
+resolve only versions published at least a week ago (installs from the lockfile are
+unaffected), and `trustPolicy: no-downgrade` refuses a release whose publishing trust evidence
+is weaker than an earlier release of the same package. A security fix younger than a
+week has to be named deliberately in `minimumReleaseAgeExclude`.
+
 ## Before you push
 
 ```bash

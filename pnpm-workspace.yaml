@@ -3,3 +3,10 @@
 # postinstall script to unpack the platform binary that Vite and Vitest use.
 allowBuilds:
   esbuild: true
+
+# Supply chain. Resolve only versions published at least a week ago (pnpm's
+# default is one day), and refuse a release whose publishing trust evidence
+# (trusted publisher / provenance) is weaker than an earlier release of the same
+# package. Installs from the lockfile are unaffected by the age gate.
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
