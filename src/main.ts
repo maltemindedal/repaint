@@ -11,7 +11,7 @@ import { Sidebar } from './ui/Sidebar.ts';
 import { sidebarViewModel } from './sidebarViewModel.ts';
 import { Toolbar } from './ui/Toolbar.ts';
 import { DropZone } from './ui/DropZone.ts';
-import { DebugPanel } from './ui/DebugPanel.ts';
+import { DebugPanel, LazyDebugPanel } from './ui/DebugPanel.ts';
 import { HelpOverlay } from './ui/HelpOverlay.ts';
 import { StatusPanel } from './ui/StatusPanel.ts';
 import { bootWhenSupported } from './ui/MobileGate.ts';
@@ -43,7 +43,12 @@ class App {
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
-  private debug: DebugPanel;
+  // Built on the first backtick press. See LazyDebugPanel.
+  private debug = new LazyDebugPanel(() => {
+    const panel = new DebugPanel(this.debugHooks());
+    panel.mount(requireElement('viewport'));
+    return panel;
+  });
   private help: HelpOverlay;
 
   private selectedKey: string | null = null;
@@ -109,8 +114,6 @@ class App {
     });
 
     this.help = new HelpOverlay(requireElement('help'));
-    this.debug = new DebugPanel(this.debugHooks());
-    this.debug.mount(requireElement('viewport'));
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 

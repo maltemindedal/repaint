@@ -157,6 +157,9 @@ export class DebugPanel {
       { name: 'baked', get: () => (this.hooks.hasBakedTextures() ? 'yes' : 'no') },
       { name: 'lights', get: () => (this.hooks.hasPunctualLights() ? 'in file' : 'none') },
     ];
+    // Fill them now: the panel is built when it is first opened, and would show
+    // placeholders until the first timer tick otherwise.
+    for (const item of this.infoControllers) info[item.name] = item.get();
     // lil-gui `.listen()` polls the object, so refresh it on a slow timer.
     setInterval(() => {
       for (const item of this.infoControllers) {
@@ -230,5 +233,41 @@ export class DebugPanel {
 
   get isVisible(): boolean {
     return this.visible;
+  }
+}
+
+/**
+ * The panel is hidden until the backtick key, yet building it costs about 30 ms
+ * of main-thread time before the first frame (the fps meter's canvases, lil-gui
+ * and its folders) and leaves five animation-frame listeners and a timer running
+ * for as long as it exists. This builds it on first use instead. Until then the
+ * frame ticks and settings syncs the app sends are no-ops: the panel reads the
+ * live settings when it is built, and a hidden one only ever caught up when it was
+ * shown anyway.
+ */
+export class LazyDebugPanel {
+  private panel: DebugPanel | null = null;
+
+  constructor(private create: () => DebugPanel) {}
+
+  toggle(): void {
+    this.panel ??= this.create();
+    this.panel.toggle();
+  }
+
+  beginFrame(): void {
+    this.panel?.beginFrame();
+  }
+
+  endFrame(): void {
+    this.panel?.endFrame();
+  }
+
+  syncSettings(settings: SceneSettings): void {
+    this.panel?.syncSettings(settings);
+  }
+
+  get isVisible(): boolean {
+    return this.panel?.isVisible ?? false;
   }
 }
