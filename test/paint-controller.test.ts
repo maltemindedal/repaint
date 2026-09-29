@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { must } from './helpers.ts';
 import { createFallbackScene } from '../src/core/fallbackScene.ts';
 import { PaintRegistry } from '../src/core/PaintRegistry.ts';
@@ -59,6 +59,24 @@ describe('paint fan-out', () => {
     expect(store.current).toEqual({ PAINT_Living_North: '#3a7fd5' });
     expect(changes).toHaveLength(1);
     expect([...must(changes[0]).colors]).toEqual([['PAINT_Living_North', '#3a7fd5']]);
+  });
+
+  it('refuses a colour it cannot parse without touching the store, the scheme or anyone listening', () => {
+    const { registry, store, paint, changes } = setup();
+    must(store.schemes[0]).colors = { PAINT_Living_North: '#aabbcc' };
+    paint.applyScheme('slot-1'); // makes slot-1 the active scheme
+    changes.length = 0;
+    store.current = {};
+    const before = registry.get('PAINT_Living_North')?.currentHex;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(paint.apply('PAINT_Living_North', 'banana')).toBeNull();
+
+    expect(registry.get('PAINT_Living_North')?.currentHex).toBe(before);
+    expect(store.current).toEqual({});
+    expect(store.activeSchemeId).toBe('slot-1');
+    expect(changes).toEqual([]);
+    warn.mockRestore();
   });
 
   it('drops the active scheme once, not on every write of a picker drag', () => {
