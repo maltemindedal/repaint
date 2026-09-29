@@ -97,5 +97,11 @@ on manual dispatch. Node 24.x, pnpm from the `packageManager` field, three jobs:
 The Build job covers both the Vite build and the single-file bundling, because
 `build:portable` runs `build` first.
 
+Third-party actions are pinned to full commit SHAs (a tag can be moved), with the
+release named in a trailing comment; checkouts do not keep the token
+(`persist-credentials: false`) because no job pushes. `.github/dependabot.yml`
+opens weekly PRs for the actions and the npm dependencies, only for releases that
+are at least a week old, matching `minimumReleaseAge` in `pnpm-workspace.yaml`.
+
 To download a built copy without building it yourself, open the CI run on GitHub
 and grab the `dist` artifact.

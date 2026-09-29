@@ -1,0 +1,18 @@
+# Keeps the SHA-pinned GitHub Actions and the npm dependencies current. The
+# 7-day cooldown matches `minimumReleaseAge` in pnpm-workspace.yaml: a release
+# has to be a week old before a PR is opened for it.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
