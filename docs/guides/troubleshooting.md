@@ -54,6 +54,17 @@ To see what the app actually found: **Scene → Log material report** in the deb
 panel prints every material with whether it is paintable, whether it came from
 the prefix, whether it carries a colour texture, and how many meshes use it.
 
+### A very large file freezes the tab or crashes it
+
+Repaint puts no limit on the size of a file or on its texture dimensions. It reads
+the whole file into memory and decodes every texture at full size, so a huge export
+(hundreds of megabytes, or textures of 8k pixels and up, which take hundreds of
+megabytes of GPU memory each) can exhaust memory and take the tab down. Nothing is
+lost when that happens (your saved colours are in `localStorage`, and the file is
+untouched), and there is no upload or server involved, so the only cost is the tab.
+Shrink the export first: lightmaps of 2K per room are usually plenty, and
+compression cuts a great deal (see [Performance](#performance)).
+
 ### The room is the wrong size, or the console warns about scene height
 
 The app warns when the scene's bounding box is taller than 100 m or shorter than
