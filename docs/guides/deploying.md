@@ -126,11 +126,14 @@ on manual dispatch. Node 24.x, pnpm from the `packageManager` field, three jobs:
 The Build job covers both the Vite build and the single-file bundling, because
 `build:portable` runs `build` first.
 
-`.github/workflows/codeql.yml` runs GitHub's CodeQL code scanning on pushes to
-`main` and on every pull request. It analyses two languages:
-`javascript-typescript` (the app, scripts and tests) and `actions` (the workflow
-files). Neither needs a build step. Findings appear under the repository's
-**Security → Code scanning** tab and as annotations on pull requests.
+CodeQL code scanning uses GitHub's default setup, so it has no workflow file.
+GitHub runs it on pushes to `main`, on pull requests to `main`, and once a week.
+It analyses each language it detects: `javascript-typescript` for the app, scripts
+and tests, `python` for `scripts/bake_export.py`, and `actions` for the workflow
+files. Findings appear under the repository's **Security → Code scanning** tab and
+as annotations on pull requests. The languages and query suite are set under
+**Settings → Advanced Security → CodeQL analysis**. Don't add a CodeQL workflow to
+`.github/workflows/`, because default setup disables it and rejects its uploads.
 
 Third-party actions are pinned to full commit SHAs (a tag can be moved), with the
 release named in a trailing comment; checkouts do not keep the token
