@@ -154,13 +154,19 @@ export function migrate(input: unknown): AppData {
   const raw = input as Partial<AppData>;
 
   if (Array.isArray(raw.library)) {
+    // The id is the only handle the UI has on an entry (remove, rename), so two
+    // entries sharing one would be removed and renamed together. An earlier merge
+    // import could write such data; the first holder keeps its id.
+    const taken = new Set<string>();
     data.library = raw.library
       .filter((c) => c && typeof c.hex === 'string')
-      .map((c, i) => ({
-        id: typeof c.id === 'string' ? c.id : `lib-${i}-${c.hex}`,
-        name: typeof c.name === 'string' && c.name ? c.name : c.hex,
-        hex: c.hex,
-      }));
+      .map((c, i) => {
+        const wanted = typeof c.id === 'string' ? c.id : `lib-${i}-${c.hex}`;
+        let id = wanted;
+        for (let n = 2; taken.has(id); n++) id = `${wanted}-${n}`;
+        taken.add(id);
+        return { id, name: typeof c.name === 'string' && c.name ? c.name : c.hex, hex: c.hex };
+      });
   }
 
   if (raw.scenes && typeof raw.scenes === 'object') {

@@ -206,7 +206,7 @@ export class AppStore {
     const normalized = normalizeHex(hex);
     if (!normalized) return null;
     const entry: LibraryColor = {
-      id: `lib-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`,
+      id: newLibraryId(),
       name: name.trim() || normalized.toUpperCase(),
       hex: normalized,
     };
@@ -270,8 +270,14 @@ export class AppStore {
       this.data = incoming;
     } else {
       const byHex = new Map(this.data.library.map((c) => [`${c.name}|${c.hex}`, c]));
+      const ids = new Set(this.data.library.map((c) => c.id));
       for (const c of incoming.library) {
-        if (!byHex.has(`${c.name}|${c.hex}`)) this.data.library.push(c);
+        if (byHex.has(`${c.name}|${c.hex}`)) continue;
+        // A colour renamed since the export arrives as new but with its old id.
+        let id = c.id;
+        while (ids.has(id)) id = newLibraryId();
+        ids.add(id);
+        this.data.library.push(id === c.id ? c : { ...c, id });
       }
       Object.assign(this.data.scenes, incoming.scenes);
     }
@@ -279,6 +285,10 @@ export class AppStore {
     this.dirty = true;
     this.flush();
   }
+}
+
+function newLibraryId(): string {
+  return `lib-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
 function dropFrom(list: string[], name: string): void {

@@ -351,6 +351,32 @@ describe('persistence', () => {
     expect(restored.settings.exposure).toBe(1.4);
   });
 
+  it('merges a library without duplicating what it already has', () => {
+    const store = new AppStore(emptyData());
+    store.addLibraryColor('Chalk', '#f2f0eb');
+    const json = store.exportJSON();
+
+    store.importJSON(json, 'merge');
+
+    expect(store.library.map((c) => c.name)).toEqual(['Chalk']);
+  });
+
+  it('gives a merged library colour a new id when its id is already taken', () => {
+    const store = new AppStore(emptyData());
+    const chalk = must(store.addLibraryColor('Chalk', '#f2f0eb'));
+    const exported = store.exportJSON();
+    // Renaming after the export means the old name|hex no longer matches, so the
+    // exported copy is a genuinely new entry that arrives with the same id.
+    store.renameLibraryColor(chalk.id, 'Chalk (hall)');
+
+    store.importJSON(exported, 'merge');
+
+    expect(store.library.map((c) => c.name).toSorted()).toEqual(['Chalk', 'Chalk (hall)']);
+    expect(new Set(store.library.map((c) => c.id)).size).toBe(2);
+    store.removeLibraryColor(chalk.id);
+    expect(store.library.map((c) => c.name)).toEqual(['Chalk']);
+  });
+
   it('lets a guess fill a setting the user has not decided, and only that', () => {
     const store = new AppStore(emptyData());
     store.useScene('apartment.glb');
@@ -363,6 +389,25 @@ describe('persistence', () => {
     store.setSetting('aoMapIntensity', 0);
     store.setDefaultSetting('aoMapIntensity', 1);
     expect(store.settings.aoMapIntensity).toBe(0);
+  });
+
+  it('repairs library entries that share an id, so removing one keeps the other', () => {
+    const data = migrate({
+      version: 1,
+      library: [
+        { id: 'lib-a', name: 'Chalk', hex: '#f2f0eb' },
+        { id: 'lib-a', name: 'Chalk (hall)', hex: '#f2f0eb' },
+        { id: 'lib-b', name: 'Sage', hex: '#a3b18a' },
+      ],
+    });
+
+    expect(data.library.map((c) => c.name)).toEqual(['Chalk', 'Chalk (hall)', 'Sage']);
+    expect(new Set(data.library.map((c) => c.id)).size).toBe(3);
+    // The first holder keeps the id it had, and unique ids are untouched.
+    expect(data.library.map((c) => c.id).filter((id) => id === 'lib-a' || id === 'lib-b')).toEqual([
+      'lib-a',
+      'lib-b',
+    ]);
   });
 
   it('always hands back three keyboard-addressable scheme slots', () => {
