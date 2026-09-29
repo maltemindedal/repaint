@@ -18,6 +18,7 @@ import { bootWhenSupported } from './ui/MobileGate.ts';
 import {
   downloadBlob,
   downloadText,
+  ignoreKeyRepeat,
   isTypingTarget,
   requireElement,
   pickFile,
@@ -490,12 +491,8 @@ class App {
 
     // Every action below is one-shot. A held key auto-repeats, and a repeat of
     // T, Tab, Backquote or P would flip tone mapping, the mode or the debug panel
-    // over and over, or download many PNGs. Tab and Backquote still need their
-    // default (focus traversal, typing a backtick) suppressed on each repeat.
-    if (event.repeat) {
-      if (event.code === 'Tab' || event.code === 'Backquote') event.preventDefault();
-      return;
-    }
+    // over and over, or download many PNGs.
+    if (ignoreKeyRepeat(event)) return;
 
     switch (event.code) {
       case 'Tab':

@@ -66,6 +66,17 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
+/**
+ * True for the auto-repeats of a held key. Shortcuts are one-shot actions, so
+ * only a fresh press should trigger one. Tab and Backquote still have their
+ * default (focus traversal, typing a backtick) suppressed on every repeat.
+ */
+export function ignoreKeyRepeat(event: KeyboardEvent): boolean {
+  if (!event.repeat) return false;
+  if (event.code === 'Tab' || event.code === 'Backquote') event.preventDefault();
+  return true;
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = el('a', { href: url, download: filename });
