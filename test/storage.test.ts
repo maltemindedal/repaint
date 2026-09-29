@@ -291,3 +291,178 @@ describe('AppStore flush', () => {
     expect(stored.library.map((c) => c.name)).toEqual(['saved in A']);
   });
 });
+
+/** Two tabs on one localStorage, both opened before either has saved anything. */
+async function twoTabs() {
+  const ls = fakeStorage();
+  vi.stubGlobal('localStorage', ls);
+  const mod = await load();
+  const tabA = new mod.AppStore(mod.loadData());
+  const tabB = new mod.AppStore(mod.loadData());
+  const stored = () => JSON.parse(ls.items.get(mod.STORAGE_KEY) ?? '{}') as AppData;
+  return { ...mod, ls, tabA, tabB, stored };
+}
+
+describe('AppStore with several tabs', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    warn.mockRestore();
+  });
+
+  it('keeps the scenes of two tabs that each edited a different file', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+
+    tabA.useScene('a.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    tabA.flush();
+    tabB.useScene('b.glb');
+    tabB.setCurrentColor('PAINT_B', '#222222');
+    tabB.flush();
+
+    expect(Object.keys(stored().scenes).toSorted()).toEqual(['a.glb', 'b.glb']);
+    expect(stored().scenes['a.glb']?.current).toEqual({ PAINT_A: '#111111' });
+    expect(stored().scenes['b.glb']?.current).toEqual({ PAINT_B: '#222222' });
+  });
+
+  it('keeps the library another tab saved when this tab only changed a scene', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+
+    tabA.addLibraryColor('saved in A', '#123456');
+    tabA.flush();
+    tabB.useScene('b.glb');
+    tabB.setCurrentColor('PAINT_B', '#222222');
+    tabB.flush();
+
+    expect(stored().library.map((c) => c.name)).toEqual(['saved in A']);
+    expect(stored().scenes['b.glb']?.current).toEqual({ PAINT_B: '#222222' });
+  });
+
+  it('keeps the scenes another tab saved when this tab only changed the library', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+
+    tabA.useScene('a.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    tabA.flush();
+    tabB.addLibraryColor('from B', '#654321');
+    tabB.flush();
+
+    expect(stored().scenes['a.glb']?.current).toEqual({ PAINT_A: '#111111' });
+    expect(stored().library.map((c) => c.name)).toEqual(['from B']);
+  });
+
+  it('lets the later save win when both tabs changed the library', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+
+    tabA.addLibraryColor('from A', '#111111');
+    tabA.flush();
+    tabB.addLibraryColor('from B', '#222222');
+    tabB.flush();
+
+    expect(stored().library.map((c) => c.name)).toEqual(['from B']);
+  });
+
+  it('lets the later save win for the same file', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+
+    tabA.useScene('x.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    tabA.flush();
+    tabB.useScene('x.glb');
+    tabB.setCurrentColor('PAINT_A', '#222222');
+    tabB.flush();
+
+    expect(stored().scenes['x.glb']?.current).toEqual({ PAINT_A: '#222222' });
+  });
+
+  it('does not rewrite a scene it has already saved when it flushes again', async () => {
+    const { ls, tabA, tabB, stored } = await twoTabs();
+    tabA.useScene('x.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    tabA.flush();
+    tabB.useScene('x.glb');
+    tabB.setCurrentColor('PAINT_A', '#222222');
+    tabB.flush();
+    ls.writes.length = 0;
+
+    tabA.flush(); // tab A's pagehide: it has nothing new to save
+
+    expect(ls.writes).toEqual([]);
+    expect(stored().scenes['x.glb']?.current).toEqual({ PAINT_A: '#222222' });
+  });
+
+  it('writes nothing just because a file was opened', async () => {
+    const { ls, tabA } = await twoTabs();
+
+    tabA.useScene('x.glb');
+    tabA.flush();
+    vi.advanceTimersByTime(5000);
+
+    expect(ls.writes).toEqual([]);
+  });
+
+  it('writes a scene once something in it has changed, not before', async () => {
+    const { ls, tabA, stored } = await twoTabs();
+
+    tabA.useScene('x.glb');
+    tabA.setSetting('exposure', 1.4);
+    tabA.flush();
+
+    expect(ls.writes).toHaveLength(1);
+    expect(stored().scenes['x.glb']?.settings).toEqual({ exposure: 1.4 });
+  });
+
+  it('lets a replacing import overwrite everything, as it always did', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+    tabA.addLibraryColor('saved in A', '#123456');
+    tabA.flush();
+    const file = JSON.stringify({
+      version: 1,
+      library: [{ id: 'lib-x', name: 'Imported', hex: '#abcdef' }],
+      scenes: {},
+    });
+
+    tabB.importJSON(file, 'replace');
+
+    expect(stored().library.map((c) => c.name)).toEqual(['Imported']);
+  });
+
+  it('merges an import into what other tabs saved: imported scenes and library are written', async () => {
+    const { tabA, tabB, stored } = await twoTabs();
+    tabA.useScene('a.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    tabA.flush();
+    const file = JSON.stringify({
+      version: 1,
+      library: [{ id: 'lib-i', name: 'Imported', hex: '#abcdef' }],
+      scenes: { 'i.glb': { current: { PAINT_I: '#333333' } } },
+    });
+
+    tabB.importJSON(file, 'merge');
+
+    expect(Object.keys(stored().scenes).toSorted()).toContain('a.glb');
+    expect(stored().scenes['i.glb']?.current).toEqual({ PAINT_I: '#333333' });
+    expect(stored().library.map((c) => c.name)).toEqual(['Imported']);
+  });
+
+  it('keeps a failed save pending and merges it once storage accepts writes again', async () => {
+    const { ls, tabA, tabB, stored } = await twoTabs();
+    tabA.useScene('a.glb');
+    tabA.setCurrentColor('PAINT_A', '#111111');
+    ls.refuseWrites = true;
+    tabA.flush();
+    ls.refuseWrites = false;
+    tabB.useScene('b.glb');
+    tabB.setCurrentColor('PAINT_B', '#222222');
+    tabB.flush();
+
+    tabA.flush();
+
+    expect(Object.keys(stored().scenes).toSorted()).toEqual(['a.glb', 'b.glb']);
+  });
+});

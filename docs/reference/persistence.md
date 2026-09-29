@@ -67,6 +67,19 @@ A pending short-delay save is never postponed by a lazy one. In walk mode the
 pose is only written once the camera has been still for 0.5 s, so walking
 somewhere is persisted rather than saved a hundred times on the way.
 
+## Several tabs
+
+Every tab shares the one storage key. A tab keeps track of what _it_ changed (which
+files' scenes, and whether the colour library) and each save re-reads what is stored
+and lays only those parts over it. So a tab never rewrites scenes or a library it did
+not touch, and a tab that changed nothing writes nothing, including when it closes.
+Opening a file writes nothing either, until something in its scene changes.
+
+Two limits remain, and both are last-writer-wins: two tabs on the **same file** (the
+demo room counts) overwrite each other's scene as a whole, and if two tabs both change
+the **colour library**, the later save wins for the library. A **replacing** import
+overwrites everything, as it always did.
+
 ## Export and import
 
 **Data → Export JSON** in the sidebar writes the whole store, including every scene
