@@ -332,7 +332,7 @@ class App {
   }
 
   private refreshAll(): void {
-    this.session.rediscover();
+    this.session.rediscover({ resetPaint: true });
     this.applyStoredSettings();
     this.render();
   }

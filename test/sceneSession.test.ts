@@ -305,6 +305,47 @@ describe('colour restore', () => {
     expect(registry.get('PAINT_Living_North')!.currentHex).toBe(exported);
   });
 
+  it('puts a wall back to its exported colour when an import no longer paints it', () => {
+    const { registry, session, store } = makeHarness();
+    session.load(makeScene());
+    const exported = registry.get('PAINT_Living_North')!.originalHex;
+    registry.setColor('PAINT_Living_North', '#ff0000');
+    store.setCurrentColor('PAINT_Living_North', '#ff0000');
+
+    // The imported entry for this file carries no live colours at all.
+    store.importJSON(
+      JSON.stringify({ version: 1, scenes: { 'apartment.glb': { current: {} } } }),
+      'merge',
+    );
+    session.rediscover({ resetPaint: true });
+
+    expect(store.currentColors).toEqual({});
+    expect(registry.get('PAINT_Living_North')!.currentHex).toBe(exported);
+    expect(
+      must(registry.get('PAINT_Living_North')!.materials[0]).color.getHexString(SRGBColorSpace),
+    ).toBe(exported.slice(1));
+  });
+
+  it('paints an imported colour and resets the walls the import leaves out', () => {
+    const { registry, session, store } = makeHarness();
+    session.load(makeScene());
+    const eastExported = registry.get('PAINT_Living_East')!.originalHex;
+    registry.setColor('PAINT_Living_East', '#ff0000');
+    store.setCurrentColor('PAINT_Living_East', '#ff0000');
+
+    store.importJSON(
+      JSON.stringify({
+        version: 1,
+        scenes: { 'apartment.glb': { current: { PAINT_Living_North: '#123456' } } },
+      }),
+      'merge',
+    );
+    session.rediscover({ resetPaint: true });
+
+    expect(registry.get('PAINT_Living_North')!.currentHex).toBe('#123456');
+    expect(registry.get('PAINT_Living_East')!.currentHex).toBe(eastExported);
+  });
+
   it('ignores stored colours for materials this scene does not have', () => {
     const { registry, session, store } = makeHarness();
     const scene = makeScene();
