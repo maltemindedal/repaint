@@ -13,6 +13,7 @@
  *
  * Run via `pnpm build:portable` (which builds first).
  */
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -41,12 +42,27 @@ js = js.replace(/\/\/# sourceMappingURL=.*$/m, '');
 // JS string/regex context `<\/script` is equivalent, so this is safe.
 js = js.replaceAll('</script', '<\\/script');
 
+// The Content-Security-Policy in index.html lets scripts come from the page's own
+// origin. This file has no origin to serve them from, only the one inline script, so
+// the policy is narrowed to exactly that script: the hash of the text between the tags.
+const inlineScript = `\n${js}\n`;
+const scriptHash = createHash('sha256').update(inlineScript).digest('base64');
+// Anchored to the policy itself: index.html's comment about it quotes the same text.
+const scriptSrc = /(http-equiv="Content-Security-Policy"\s+content="[^"]*?)script-src\s+'self'/;
+if (!scriptSrc.test(html)) {
+  throw new Error(
+    "Could not find `script-src 'self'` in the Content-Security-Policy of dist/index.html. " +
+      'Without it the portable file would either be blocked or unprotected.',
+  );
+}
+
 // Replacer *functions*, not strings: minified JS is full of `$'`/`$&`-style
 // sequences that String.replace would interpret as replacement patterns and
 // silently corrupt the output.
 const out = html
   .replace(styleMatch[0], () => `<style>\n${css}\n</style>`)
-  .replace(scriptMatch[0], () => `<script type="module">\n${js}\n</script>`);
+  .replace(scriptMatch[0], () => `<script type="module">${inlineScript}</script>`)
+  .replace(scriptSrc, (_, before) => `${before}script-src 'sha256-${scriptHash}'`);
 
 const target = resolve(dist, 'repaint.html');
 await writeFile(target, out);

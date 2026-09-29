@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
+    <!--
+      Egress control for a page that never needs the network beyond its own files. Every
+      directive is here for a reason, see docs/guides/deploying.md. `'unsafe-eval'` is
+      for the KTX2 transcoder (it builds functions), `'wasm-unsafe-eval'` for the Draco and
+      Basis WebAssembly, `blob:` for the decoder workers and for embedded images. In
+      the portable repaint.html scripts/make-portable.mjs replaces `script-src 'self'` with
+      the hash of the one inline script it writes.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'none';
+        script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        font-src data:;
+        connect-src 'self' data: blob:;
+        worker-src blob:;
+        base-uri 'none';
+        form-action 'none';
+        object-src 'none'
+      "
+    />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1a1a'/%3E%3Cpath d='M6 22V12l10-6 10 6v10z' fill='none' stroke='%23c9c9c9' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='17' r='3.2' fill='%23e8e4da'/%3E%3C/svg%3E"
