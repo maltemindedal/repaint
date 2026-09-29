@@ -126,6 +126,13 @@ on manual dispatch. Node 24.x, pnpm from the `packageManager` field, three jobs:
 The Build job covers both the Vite build and the single-file bundling, because
 `build:portable` runs `build` first.
 
+`.github/workflows/codeql.yml` runs GitHub's CodeQL code scanning on the same
+events plus a weekly schedule, so new queries also reach unchanged code. It
+analyses two languages: `javascript-typescript` (the app, scripts and tests) and
+`actions` (the workflow files). Neither needs a build step. Findings appear under
+the repository's **Security → Code scanning** tab and as annotations on pull
+requests.
+
 Third-party actions are pinned to full commit SHAs (a tag can be moved), with the
 release named in a trailing comment; checkouts do not keep the token
 (`persist-credentials: false`) because no job pushes. `.github/dependabot.yml`
