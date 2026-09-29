@@ -14,10 +14,9 @@
  * Run via `pnpm build:portable` (which builds first).
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-const dist = resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
+const dist = resolve(import.meta.dirname, '../dist');
 const html = await readFile(resolve(dist, 'index.html'), 'utf8');
 
 // The entry bundle and stylesheet as Vite wrote them into index.html.

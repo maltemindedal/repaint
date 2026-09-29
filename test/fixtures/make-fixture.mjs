@@ -14,34 +14,13 @@
  *   node test/fixtures/make-fixture.mjs
  */
 import { writeFileSync } from 'node:fs';
-import { deflateSync } from 'node:zlib';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { crc32, deflateSync } from 'node:zlib';
+import { resolve } from 'node:path';
 import { BoxGeometry, Euler, Matrix4, PlaneGeometry, Quaternion, Vector3 } from 'three';
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = import.meta.dirname;
 
 // ---------------------------------------------------------------- PNG writer
-
-/** @type {Int32Array | null} */
-let crcTable = null;
-
-/** @param {Buffer} buf */
-function crc32(buf) {
-  if (!crcTable) {
-    crcTable = new Int32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      crcTable[n] = c;
-    }
-  }
-  let crc = -1;
-  for (let i = 0; i < buf.length; i++) {
-    crc = (crc >>> 8) ^ (crcTable[(crc ^ (buf[i] ?? 0)) & 0xff] ?? 0);
-  }
-  return (crc ^ -1) >>> 0;
-}
 
 /**
  * @param {string} type
