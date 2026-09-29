@@ -130,6 +130,12 @@ class App {
     this.nav.onPoseChange = (mode, pose) => this.store.setPose(mode, pose);
     this.nav.walk.onEyeHeightChange = (value) => this.storeEyeHeight(value);
 
+    this.store.onSaveFailed = () =>
+      this.panel.status(
+        'Your changes could not be saved (browser storage is full or blocked) and will be lost when this tab closes.',
+        10000,
+      );
+
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pagehide', () => this.store.flush());
 

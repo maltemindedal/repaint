@@ -120,8 +120,10 @@ matters. See [Persistence](../reference/persistence.md).
 
 The app falls back to in-memory storage when `localStorage` is unavailable.
 Safari private mode has the API but throws on write. State then lasts only for
-the session. Save failures (including quota) are logged as
-`[storage] save failed (quota?)`.
+the session. When saving starts failing (a full quota, blocked site data, or
+that private mode) the app says so once in the status line, and logs
+`[storage] save failed (quota?)`. Saved data that is already there is still read
+even when the browser will no longer accept writes.
 
 Corrupt saved data is not fatal: everything read back is validated field by field
 and anything malformed is dropped, with `[storage] could not read saved data,

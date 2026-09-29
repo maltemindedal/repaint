@@ -13,9 +13,10 @@ apartment-walkthrough:v1
 That is the pre-rename key, kept as-is so schemes and libraries saved before the
 app was called Repaint still load (`STORAGE_KEY` in `src/state/storage.ts`).
 
-If `localStorage` is unavailable, as in Safari private mode where the API throws on
-write, the app falls back to an in-memory store, and state lasts
-only for the session.
+If `localStorage` is unavailable or refuses a write (a full quota, blocked site data,
+or Safari private mode where the API throws on write), the app falls back to an
+in-memory store, and state lasts only for the session. It says so once in the
+status line when saving starts failing; data already saved is still read.
 
 ## Scope: per scene, keyed by file name
 

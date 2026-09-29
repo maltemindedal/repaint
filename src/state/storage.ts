@@ -5,27 +5,25 @@ import type { AppData } from '../types.ts';
 export const STORAGE_KEY = 'apartment-walkthrough:v1';
 
 /**
- * localStorage with an in-memory fallback so the same code path works under
- * `vitest` (node, no DOM) and in private-browsing modes where localStorage
- * throws on write.
+ * localStorage, with an in-memory copy for whatever it would not take. That keeps
+ * the same code path working under `vitest` (node, no DOM) and where the browser
+ * refuses writes (a full quota, or an old Safari private window whose API exists
+ * but throws on `setItem`): the session still sees its own changes, they just
+ * don't outlive the tab.
  */
 const memory = new Map<string, string>();
 
-function backend(): Pick<Storage, 'getItem' | 'setItem'> {
+/** True while saves are failing, so the console hears about it once per episode. */
+let failing = false;
+
+/** `localStorage`, or null where it doesn't exist or the browser denies access to it. */
+function local(): Storage | null {
   try {
-    if (typeof localStorage !== 'undefined') {
-      // Probe: Safari private mode has the API but throws on setItem.
-      localStorage.setItem(`${STORAGE_KEY}:probe`, '1');
-      localStorage.removeItem(`${STORAGE_KEY}:probe`);
-      return localStorage;
-    }
+    return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
-    /* fall through to memory */
+    // With site data blocked, merely reading the property throws a SecurityError.
+    return null;
   }
-  return {
-    getItem: (k) => memory.get(k) ?? null,
-    setItem: (k, v) => void memory.set(k, v),
-  };
 }
 
 export function emptyData(): AppData {
@@ -34,7 +32,8 @@ export function emptyData(): AppData {
 
 export function loadData(): AppData {
   try {
-    const raw = backend().getItem(STORAGE_KEY);
+    // A copy in memory is newer than storage: it holds a save storage refused.
+    const raw = memory.get(STORAGE_KEY) ?? local()?.getItem(STORAGE_KEY);
     if (!raw) return emptyData();
     return migrate(JSON.parse(raw));
   } catch (err) {
@@ -43,12 +42,30 @@ export function loadData(): AppData {
   }
 }
 
-export function saveData(data: AppData): void {
+/**
+ * Persists the data. Returns whether it reached `localStorage`; false means it
+ * lives in this session only (storage full, blocked, or absent).
+ */
+export function saveData(data: AppData): boolean {
   try {
-    backend().setItem(STORAGE_KEY, JSON.stringify(data));
+    const json = JSON.stringify(data);
+    const store = local();
+    if (store) {
+      try {
+        store.setItem(STORAGE_KEY, json);
+        memory.delete(STORAGE_KEY);
+        failing = false;
+        return true;
+      } catch (err) {
+        if (!failing) console.warn('[storage] save failed (quota?)', err);
+        failing = true;
+      }
+    }
+    memory.set(STORAGE_KEY, json);
   } catch (err) {
-    console.warn('[storage] save failed (quota?)', err);
+    console.warn('[storage] could not serialise saved data', err);
   }
+  return false;
 }
 
 // ------------------------------------------------------------- validation

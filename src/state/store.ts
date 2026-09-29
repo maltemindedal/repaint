@@ -60,6 +60,13 @@ export class AppStore {
   private data: AppData;
   private sceneKey = '__fallback__';
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveFailing = false;
+
+  /**
+   * Called when saving starts failing (storage full or blocked), so the app can
+   * say so. Not called again until a save has worked in between.
+   */
+  onSaveFailed: (() => void) | null = null;
 
   constructor(data: AppData = loadData()) {
     this.data = data;
@@ -79,14 +86,20 @@ export class AppStore {
     }
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
-      saveData(this.data);
+      this.persist();
     }, delay);
   }
 
   flush(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    saveData(this.data);
+    this.persist();
+  }
+
+  private persist(): void {
+    const saved = saveData(this.data);
+    if (!saved && !this.saveFailing) this.onSaveFailed?.();
+    this.saveFailing = !saved;
   }
 
   // ----------------------------------------------------------------- scene
