@@ -4,10 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Weekly, so new queries run against code that hasn't changed.
-  schedule:
-    - cron: '23 4 * * 1'
-  workflow_dispatch:
 
 # A new push to the same branch supersedes the run already in flight.
 concurrency:
