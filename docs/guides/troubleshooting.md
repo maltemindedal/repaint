@@ -24,12 +24,13 @@ Or build the double-clickable single file with `pnpm build:portable`. See
 
 ### "Repaint could not start"
 
-The app draws with WebGL 2 and the browser would not create a context. The page
-shows what the browser reported, and the console has the full error under
-`[boot] failed`. The usual causes are hardware acceleration switched off in the
-browser's settings, a GPU or driver on the browser's blocklist, and remote-desktop
-or virtual-machine sessions without a GPU. Turn hardware acceleration on, update
-the graphics driver, and reload.
+The app draws with WebGL 2, and the usual reason it cannot start is that the
+browser would not create a context. The page shows what the browser reported, and
+the console has the full error under `[boot] failed`. The usual causes of a missing
+context are hardware acceleration switched off in the browser's settings, a GPU or
+driver on the browser's blocklist, and remote-desktop or virtual-machine sessions
+without a GPU. Turn hardware acceleration on, update the graphics driver, and
+reload. If the message is about something else, it is a bug worth reporting.
 
 ### A compressed `.glb` fails to load from the portable file
 
@@ -130,9 +131,11 @@ matters. See [Persistence](../reference/persistence.md).
 The app falls back to in-memory storage when `localStorage` is unavailable.
 Safari private mode has the API but throws on write. State then lasts only for
 the session. When saving starts failing (a full quota, blocked site data, or
-that private mode) the app says so once in the status line, and logs
-`[storage] save failed (quota?)`. Saved data that is already there is still read
-even when the browser will no longer accept writes.
+that private mode) the app says so once in the status line. When the browser
+refuses a write (a full quota, or that private mode) it also logs
+`[storage] save failed (quota?)`; with site data blocked there is no storage to
+write to, so only the status line says so. Saved data that is already there is
+still read even when the browser will no longer accept writes.
 
 Corrupt saved data is not fatal: everything read back is validated field by field
 and anything malformed is dropped, with `[storage] could not read saved data,

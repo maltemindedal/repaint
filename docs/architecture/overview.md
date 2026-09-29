@@ -36,7 +36,7 @@ src/
     store.ts               All persisted state, debounced writes
     storage.ts             localStorage + memory fallback; validating migration
   ui/                      Sidebar, ColorPicker, Toolbar, DropZone, DebugPanel,
-                           HelpOverlay, StatusPanel, MobileGate, swatches
+                           HelpOverlay, StatusPanel, MobileGate, BootError, swatches
   util/                    color.ts (sRGB hex helpers), dom.ts
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
@@ -147,18 +147,30 @@ timer than everything else since they change every frame you move.
 `WalkMotion.ts` deliberately need no renderer. That is what lets the tests run the
 real pipeline headlessly in node.
 
-| File                       | Tests | Covers                                                                                                                                                                                      |
-| -------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `smoke.test.ts`            |    26 | The fallback scene end to end: discovery, the colour write path, scheme capture/apply, name cleanup, persistence round-trips, ORM-vs-lightmap classification, sanitising corrupt saved data |
-| `sceneSession.test.ts`     |    17 | The scene-activation order, against a recording picker and camera                                                                                                                           |
-| `sidebar.test.ts`          |    16 | Which sections a render rebuilds, which it leaves standing, what survives an open colour picker                                                                                             |
-| `walk-motion.test.ts`      |    12 | Eye-height ownership                                                                                                                                                                        |
-| `navigation.test.ts`       |     9 | Orbit ⇄ walk hand-off, against a stub DOM                                                                                                                                                   |
-| `paint-controller.test.ts` |     8 | The fan-out against a fake store: which walls each operation reports, and that scheme rows re-render exactly when the slots change and not once more                                        |
-| `viewModel.test.ts`        |     6 | The sidebar view model in plain node. Nothing from three.js leaks in, and paint rows are _snapshots_ rather than the registry's live targets                                                |
+| File                       | Tests | Covers                                                                                                                                                                                                                                           |
+| -------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `smoke.test.ts`            |    32 | The fallback scene end to end: discovery, the colour write path (and refusing a colour it cannot parse), scheme capture/apply, name cleanup, persistence round-trips, library ids, ORM-vs-lightmap classification, sanitising corrupt saved data |
+| `sidebar.test.ts`          |    19 | Which sections a render rebuilds, which it leaves standing, what survives an open colour picker, and that saved colours only ever paint a background                                                                                             |
+| `sceneSession.test.ts`     |    19 | The scene-activation order against a recording picker and camera, and what an import does to the walls                                                                                                                                           |
+| `storage.test.ts`          |    16 | The localStorage backend and the store's save path: reads that write nothing, full or blocked storage, a tab that changed nothing writing nothing, one notice per failing episode                                                                |
+| `sceneLoader.test.ts`      |    12 | Loading a file into the viewer scene: the swap only after a good parse, the most recent request winning, progress                                                                                                                                |
+| `walk-motion.test.ts`      |    12 | Eye-height ownership                                                                                                                                                                                                                             |
+| `walkControls.test.ts`     |    12 | Walk-mode keys: movement and sprint, and browser shortcuts left alone                                                                                                                                                                            |
+| `keyRepeat.test.ts`        |    11 | Ignoring the auto-repeats of a held key for one-shot shortcuts                                                                                                                                                                                   |
+| `navigation.test.ts`       |     9 | Orbit ⇄ walk hand-off, against a stub DOM                                                                                                                                                                                                        |
+| `loaders.test.ts`          |     9 | What a dropped glTF may reference: only `data:` and `blob:` URLs, for the glTF loader and for KTX2 textures                                                                                                                                      |
+| `paint-controller.test.ts` |     9 | The fan-out against a fake store: which walls each operation reports, that scheme rows re-render exactly when the slots change and not once more, and that a refused colour changes nothing                                                      |
+| `viewerScreenshot.test.ts` |     8 | One screenshot at a time, and the pixel ratio always restored, against a fake renderer                                                                                                                                                           |
+| `swatch.test.ts`           |     7 | Colours reach the DOM through the CSSOM, never as markup                                                                                                                                                                                         |
+| `bootError.test.ts`        |     6 | The page shown when the app cannot start                                                                                                                                                                                                         |
+| `viewModel.test.ts`        |     6 | The sidebar view model in plain node. Nothing from three.js leaks in, and paint rows are _snapshots_ rather than the registry's live targets                                                                                                     |
+| `lazyDebugPanel.test.ts`   |     5 | The debug panel is built on first use, and ignored until then                                                                                                                                                                                    |
+| `disposeSubtree.test.ts`   |     4 | Freeing a scene's GPU resources, instanced meshes included                                                                                                                                                                                       |
 
-94 tests total. Only `sidebar.test.ts` needs a document; it opts into happy-dom
-with a `@vitest-environment` docblock so the rest of the suite stays in plain node.
+196 tests total. The ones that need a document (`bootError`, `keyRepeat`,
+`sceneLoader`, `sidebar`, `swatch`, `viewerScreenshot` and `walkControls`) opt into
+happy-dom with a `@vitest-environment` docblock, so the rest of the suite stays in
+plain node.
 
 Whether `main.ts` then draws both views is browser-side and not covered. The
 sidebar/toolbar seam is the next thing worth deepening.

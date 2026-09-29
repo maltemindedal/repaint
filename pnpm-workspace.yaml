@@ -5,6 +5,8 @@
 # Supply chain. Resolve only versions published at least a week ago (pnpm's
 # default is one day), and refuse a release whose publishing trust evidence
 # (trusted publisher / provenance) is weaker than an earlier release of the same
-# package. Installs from the lockfile are unaffected by the age gate.
+# package. `pnpm install --frozen-lockfile` checks every locked release against
+# both settings too, so a locked release younger than a week fails it until it
+# has aged or is listed under `minimumReleaseAgeExclude`.
 minimumReleaseAge: 10080
 trustPolicy: no-downgrade
