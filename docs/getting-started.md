@@ -9,7 +9,7 @@ an export ready.
 | Tool    | Version                                  | Notes                                                                                                       |
 | ------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Node    | 24.x                                     | What CI runs and the app is developed against (`.github/workflows/ci.yml`). No `engines` field enforces it. |
-| pnpm    | 11.10.0                                  | Pinned by the `packageManager` field in `package.json`. `corepack enable` picks it up automatically.        |
+| pnpm    | 11.27.1                                  | Pinned by the `packageManager` field in `package.json`. `corepack enable` picks it up automatically.        |
 | Browser | Any current desktop browser with WebGL 2 | Touch-only devices get a "use a desktop" page instead. See [the gate](#a-note-on-phones-and-tablets).       |
 
 ## 1. Install and run

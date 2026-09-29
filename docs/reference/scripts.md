@@ -50,7 +50,7 @@ at the first.
 | Tool           | Version           | Pinned by                                                                                              |
 | -------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
 | Node           | 24.x              | `NODE_VERSION` in `.github/workflows/ci.yml`. No `engines` field enforces it locally.                  |
-| pnpm           | 11.10.0           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
+| pnpm           | 11.27.1           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
 | TypeScript     | ^5.9.2            | `package.json`                                                                                         |
 | Vite           | ^8.2.1            | `package.json`                                                                                         |
 | Vitest         | ^3.2.4            | `package.json`                                                                                         |
