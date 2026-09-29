@@ -17,7 +17,6 @@
   --g-200: #c9c9c9;
   --g-100: #e8e8e8;
 
-  --accent: #d6d6d6;
   --danger: #d98b8b;
 
   --sidebar-w: 340px;
@@ -1065,4 +1064,30 @@ html.app-unlocked #mobile-gate {
 
 .gate-continue:active {
   color: var(--g-300);
+}
+
+/*
+ * Shown instead of everything else when the app cannot start (usually no WebGL
+ * 2). The class is set on <html> by src/ui/BootError.ts. Reuses the gate card.
+ */
+
+#boot-error {
+  display: none;
+}
+
+html.boot-failed #app,
+html.boot-failed #mobile-gate {
+  display: none;
+}
+
+html.boot-failed #boot-error {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  background: var(--g-900);
+  padding: 24px 20px;
 }

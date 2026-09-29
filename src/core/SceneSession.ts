@@ -105,10 +105,16 @@ export class SceneSession {
    * Re-runs discovery against the scene already on screen, after a manual tag
    * change or a settings import. The scene graph is unchanged, so the picker
    * refreshes in place instead of resetting.
+   *
+   * A re-tag keeps the paint every wall is wearing. An import replaces the
+   * store's record of this file, so it passes `resetPaint` to start every wall
+   * from its exported colour before the record is played back; otherwise a wall
+   * the imported record doesn't mention would stay painted on screen while the
+   * store, and the next reload, say it is pristine.
    */
-  rediscover(): void {
+  rediscover({ resetPaint = false }: { resetPaint?: boolean } = {}): void {
     if (!this.current) return;
-    this.discoverTargets();
+    this.discoverTargets(resetPaint);
     this.deps.picker.refreshTargets();
     this.hooks.targetsChanged(this.deps.registry.list());
   }
@@ -143,13 +149,14 @@ export class SceneSession {
    * its own. Use one restore mechanism so there is no second copy to
    * drift out of agreement with the sidebar.
    */
-  private discoverTargets(): void {
+  private discoverTargets(resetPaint = false): void {
     const { registry, store } = this.deps;
     const scene = this.current;
     if (!scene) return;
 
     const prefs = store.scene;
     registry.discover(scene.root, { tagged: prefs.tagged, untagged: prefs.untagged });
+    if (resetPaint) registry.resetAll();
 
     // Straight to the registry, not through `PaintController`: this reads
     // *from* the store, so writing back would only re-save it and drop the

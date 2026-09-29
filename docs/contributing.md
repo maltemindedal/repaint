@@ -14,10 +14,17 @@ pnpm is pinned by the `packageManager` field, so `corepack enable` gets you the
 right version. The exact toolchain versions, and where each is pinned, are the
 table in [reference/scripts.md § Toolchain versions](reference/scripts.md#toolchain-versions).
 
-pnpm blocks dependency build scripts by default. `pnpm-workspace.yaml` allows
-exactly one build script, esbuild's postinstall, which unpacks the platform binary Vite and
-Vitest need. If you add a dependency that needs a build step, it goes there
-deliberately.
+pnpm blocks dependency build scripts by default, and nothing in the tree needs
+one today. If you add a dependency that needs a build step, allow it deliberately
+under `allowBuilds` in `pnpm-workspace.yaml`.
+
+`pnpm-workspace.yaml` also holds two supply-chain guards. `minimumReleaseAge` makes pnpm
+resolve only versions published at least a week ago, and `trustPolicy: no-downgrade` refuses
+a release whose publishing trust evidence is weaker than an earlier release of the same
+package. Both are also checked against every release already in the lockfile, so
+`pnpm install --frozen-lockfile` (and CI) fails on a locked release that breaks them. A
+security fix younger than a week has to be named deliberately in `minimumReleaseAgeExclude`,
+and stays listed there until it is a week old.
 
 ## Before you push
 
@@ -25,8 +32,8 @@ deliberately.
 pnpm check
 ```
 
-That is `tsc --noEmit && oxlint && oxfmt --check`, the same three checks CI runs,
-in one command. Plus:
+That is `tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint --deny-warnings && oxfmt --check`,
+the same checks CI runs, in one command. Plus:
 
 ```bash
 pnpm test
@@ -62,8 +69,8 @@ breakdown, and which seams each file pins, is the table in
 
 Formatting is `oxfmt` (100 columns, single quotes) and linting is `oxlint`
 (`typescript`, `unicorn`, `oxc` and `import` plugins; `correctness` is an error,
-`suspicious` and `perf` are warnings). Both configs are in the repo root. Don't
-fight them, run `pnpm format`.
+`suspicious` and `perf` are warnings, and `pnpm lint` fails on warnings, so the tree
+stays at zero). Both configs are in the repo root. Don't fight them, run `pnpm format`.
 
 Beyond what the tools check, the house style in this codebase is:
 

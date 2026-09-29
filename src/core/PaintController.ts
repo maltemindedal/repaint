@@ -44,12 +44,16 @@ export class PaintController {
     private store: PaintStore,
   ) {}
 
-  /** Paints one target. Null when the scene has no such target. */
+  /**
+   * Paints one target. Null when the scene has no such target, or when `hex` is
+   * not a colour (saved data can hold anything): nothing changes, and nobody is
+   * told a wall was painted.
+   */
   apply(key: string, hex: string): PaintTarget | null {
     const target = this.registry.get(key);
     if (!target) return null;
     const before = target.currentHex;
-    this.registry.setColor(key, hex);
+    if (!this.registry.setColor(key, hex)) return null;
     this.store.setCurrentColor(key, target.currentHex);
     // Hand-painting a wall means the scene no longer *is* the saved scheme.
     this.emit(moved(target, before), this.selectScheme(null));

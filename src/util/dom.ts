@@ -26,6 +26,22 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/**
+ * `el()` filled with a colour. The colour is set through the CSSOM, which takes
+ * exactly one `<color>`. Interpolating it into a `style` attribute instead would
+ * let an imported or hand-edited value carry more declarations with it
+ * (`red;background-image:url(https://…)`), and the browser would honour them.
+ */
+export function colorEl<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  color: string,
+  attrs: Attrs = {},
+): HTMLElementTagNameMap[K] {
+  const node = el(tag, attrs);
+  node.style.backgroundColor = color;
+  return node;
+}
+
 export function clear(node: HTMLElement): void {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
@@ -48,6 +64,17 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+
+/**
+ * True for the auto-repeats of a held key. Shortcuts are one-shot actions, so
+ * only a fresh press should trigger one. Tab and Backquote still have their
+ * default (focus traversal, typing a backtick) suppressed on every repeat.
+ */
+export function ignoreKeyRepeat(event: KeyboardEvent): boolean {
+  if (!event.repeat) return false;
+  if (event.code === 'Tab' || event.code === 'Backquote') event.preventDefault();
+  return true;
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -76,7 +103,7 @@ export function pickFile(accept: string): Promise<File | null> {
       resolve(file);
     };
     input.addEventListener('change', () => done(input.files?.[0] ?? null));
-    // `cancel` isn't universally supported; the window focus fallback covers it.
+    // Fires when the picker is dismissed without a choice (Chrome 113+, Firefox 91+, Safari 16.4+).
     input.addEventListener('cancel', () => done(null));
     input.click();
   });

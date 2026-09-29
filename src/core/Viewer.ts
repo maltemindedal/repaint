@@ -6,17 +6,22 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  Timer,
   WebGLRenderer,
   type Texture,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { isMesh, materialsOf } from './materials.ts';
+import { FrameLoop } from './FrameLoop.ts';
+import { wakeOnInput } from './wakeOnInput.ts';
 
-export type FrameCallback = (dt: number, elapsed: number) => void;
+/** Advances something by `dt` seconds. Returns true while it is still moving. */
+export type FrameCallback = (dt: number, elapsed: number) => boolean;
 
 /**
  * Renderer, camera, scene and the frame loop.
+ *
+ * The loop draws only while something needs a frame (see `FrameLoop`). Whatever
+ * changes the picture from outside the frame callbacks has to call `invalidate`;
+ * every setter here does, and so does user input (see `wakeOnInput`).
  *
  * Colour-management contract:
  *  - `outputColorSpace = SRGBColorSpace` and `ColorManagement` (on by default
@@ -32,13 +37,22 @@ export class Viewer {
   readonly camera: PerspectiveCamera;
   readonly canvas: HTMLCanvasElement;
 
-  private timer = new Timer();
   private callbacks = new Set<FrameCallback>();
-  private rafId = 0;
+  private loop = new FrameLoop({
+    update: (dt, elapsed, resumed) => this.step(dt, elapsed, resumed),
+    draw: () => this.renderer.render(this.scene, this.camera),
+    keepAlive: () => this.keepAlive(),
+  });
   private envTexture: Texture | null = null;
-  private pmrem: PMREMGenerator | null = null;
+  private capturing: Promise<Blob | null> | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private maxPixelRatio = 2;
+
+  /**
+   * True to draw every frame while it holds: something on screen measures frame
+   * rate, or the frame rate itself is being measured.
+   */
+  keepAlive: () => boolean = () => false;
 
   // Rolling FPS, used by the perf hint and the debug readout.
   private frameTimes: number[] = [];
@@ -69,6 +83,12 @@ export class Viewer {
     this.camera = new PerspectiveCamera(55, 1, 0.05, 500);
     this.camera.position.set(3, 1.65, 3);
 
+    // Added after the renderer's own listener, so three has re-initialised its
+    // state by the time this runs.
+    canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+
+    wakeOnInput(window, canvas, this.invalidate);
+
     this.resize();
     window.addEventListener('resize', this.resize);
     if (typeof ResizeObserver !== 'undefined') {
@@ -88,21 +108,34 @@ export class Viewer {
    */
   initEnvironment(): void {
     if (this.envTexture) return;
-    this.pmrem = new PMREMGenerator(this.renderer);
-    this.pmrem.compileEquirectangularShader();
+    const pmrem = new PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
-    const target = this.pmrem.fromScene(room, 0.04);
+    const target = pmrem.fromScene(room, 0.04);
     this.envTexture = target.texture;
     this.scene.environment = this.envTexture;
-    room.traverse((obj) => {
-      if (!isMesh(obj)) return;
-      obj.geometry.dispose();
-      for (const mat of materialsOf(obj)) mat.dispose();
-    });
+    // Only the finished texture is kept. The generator's ping-pong target and
+    // blur/convolution programs, and the room's geometry and materials, are not
+    // needed again, so give them back.
+    pmrem.dispose();
+    room.dispose();
   }
+
+  /**
+   * After a GPU reset, driver update, sleep/wake or GPU switch three restores
+   * ordinary textures and geometry itself, but a render target's contents are
+   * not recoverable. The environment map is one, so without this every wall is
+   * lit differently (darker, black furniture) until the page is reloaded.
+   */
+  private onContextRestored = (): void => {
+    this.envTexture?.dispose();
+    this.envTexture = null;
+    this.initEnvironment();
+    this.invalidate();
+  };
 
   setEnvIntensity(value: number): void {
     this.scene.environmentIntensity = value;
+    this.invalidate();
   }
 
   setBackground(hex: string): void {
@@ -111,17 +144,20 @@ export class Viewer {
     } else {
       this.scene.background = new Color().setStyle(hex, SRGBColorSpace);
     }
+    this.invalidate();
   }
 
   // -------------------------------------------------------- tone mapping
 
   setExposure(value: number): void {
     this.renderer.toneMappingExposure = value;
+    this.invalidate();
   }
 
   setToneMapping(enabled: boolean): void {
     // three notices the change and recompiles affected programs on its own.
     this.renderer.toneMapping = enabled ? ACESFilmicToneMapping : NoToneMapping;
+    this.invalidate();
   }
 
   setMaxPixelRatio(value: number): void {
@@ -138,18 +174,24 @@ export class Viewer {
   }
 
   start(): void {
-    if (this.rafId) return;
-    const tick = (timestamp: number) => {
-      this.rafId = requestAnimationFrame(tick);
-      this.timer.update(timestamp);
-      // Clamp: a background tab produces a huge first delta on return.
-      const dt = Math.min(this.timer.getDelta(), 0.1);
-      const elapsed = this.timer.getElapsed();
-      this.trackFps(dt);
-      for (const fn of this.callbacks) fn(dt, elapsed);
-      this.renderer.render(this.scene, this.camera);
-    };
-    this.rafId = requestAnimationFrame(tick);
+    this.loop.start();
+  }
+
+  /**
+   * The picture is out of date: draw it again. For changes made outside a frame
+   * callback (a colour, a setting, a resize). A frame is only an `update` and a
+   * `draw`, so asking for more than are needed costs almost nothing.
+   */
+  invalidate = (): void => {
+    this.loop.invalidate();
+  };
+
+  private step(dt: number, elapsed: number, resumed: boolean): boolean {
+    // The first frame after a sleep says nothing about how fast frames come.
+    if (!resumed) this.trackFps(dt);
+    let moving = false;
+    for (const fn of this.callbacks) moving = fn(dt, elapsed) || moving;
+    return moving;
   }
 
   private trackFps(dt: number): void {
@@ -174,6 +216,8 @@ export class Viewer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    // Setting the size empties the canvas.
+    this.invalidate();
   };
 
   get size(): { width: number; height: number } {
@@ -189,24 +233,35 @@ export class Viewer {
   /**
    * Renders one frame at `scale`x the on-screen resolution and returns a PNG
    * blob. Aspect ratio is unchanged, so the framing matches exactly what you
-   * were looking at.
+   * were looking at. Null if the canvas gives no image.
+   *
+   * One capture at a time: a call made while another is running gets that
+   * capture's result. A second capture would read the already-raised pixel ratio
+   * as the one to restore, and leave the renderer stuck at it (4x the pixels)
+   * until reload. The ratio is put back even if rendering throws.
    */
-  async screenshot(scale = 2): Promise<Blob | null> {
+  screenshot(scale = 2): Promise<Blob | null> {
+    this.capturing ??= this.capture(scale).finally(() => {
+      this.capturing = null;
+    });
+    return this.capturing;
+  }
+
+  private async capture(scale: number): Promise<Blob | null> {
     const previousRatio = this.renderer.getPixelRatio();
     const { width, height } = this.size;
-    const wanted = Math.min(previousRatio * scale, 4);
+    try {
+      this.renderer.setPixelRatio(Math.min(previousRatio * scale, 4));
+      this.renderer.setSize(width, height, false);
+      this.renderer.render(this.scene, this.camera);
 
-    this.renderer.setPixelRatio(wanted);
-    this.renderer.setSize(width, height, false);
-    this.renderer.render(this.scene, this.camera);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      this.canvas.toBlob((b) => resolve(b), 'image/png');
-    });
-
-    this.renderer.setPixelRatio(previousRatio);
-    this.renderer.setSize(width, height, false);
-    this.renderer.render(this.scene, this.camera);
-    return blob;
+      return await new Promise<Blob | null>((resolve) => {
+        this.canvas.toBlob((b) => resolve(b), 'image/png');
+      });
+    } finally {
+      this.renderer.setPixelRatio(previousRatio);
+      this.renderer.setSize(width, height, false);
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }

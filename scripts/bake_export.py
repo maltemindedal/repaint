@@ -95,7 +95,7 @@ def parse_options() -> Options:
                         "bake image is per material); 'single' = one atlas "
                         "for everything")
     p.add_argument("--gpu", action="store_true",
-                   help="try to bake on the GPU (Metal/CUDA/OptiX/HIP)")
+                   help="try to bake on the GPU (Metal/CUDA/OptiX/HIP/oneAPI)")
     p.add_argument("--draco", action="store_true",
                    help="enable Draco compression in the export")
     p.add_argument("--no-lights", action="store_true",
@@ -150,7 +150,7 @@ def enable_gpu() -> str | None:
                 prefs.compute_device_type = dtype
             except TypeError:
                 continue
-            prefs.get_devices()
+            prefs.refresh_devices()
             found = [d for d in prefs.devices if d.type == dtype]
             if found:
                 for d in prefs.devices:
@@ -165,7 +165,9 @@ def world_emits_light(world: bpy.types.World | None) -> bool:
     """Best-effort check whether the world contributes any light."""
     if world is None:
         return False
-    if not world.use_nodes:
+    # Blender 5.0 made every world use nodes and deprecated the flag (removal in
+    # 6.0); reading it there only prints a warning.
+    if bpy.app.version < (5, 0, 0) and not world.use_nodes:
         return bool(max(world.color[:3]) > 0.0)
     for node in world.node_tree.nodes:
         if node.bl_idname in ("ShaderNodeTexEnvironment", "ShaderNodeTexSky"):
@@ -351,7 +353,10 @@ def gltf_output_tree() -> bpy.types.ShaderNodeTree:
 def wire_material(mat: bpy.types.Material, image: bpy.types.Image) -> None:
     """Bake image node (active, unconnected to shading) + UV Map node +
     glTF Material Output group with the bake in its Occlusion input."""
-    mat.use_nodes = True
+    # Blender 5.0 made every material use nodes and deprecated `use_nodes` (removal
+    # in 6.0); earlier versions still need it switched on to get a node tree.
+    if bpy.app.version < (5, 0, 0):
+        mat.use_nodes = True
     nt = mat.node_tree
 
     tex = nt.nodes.get(BAKE_NODE)

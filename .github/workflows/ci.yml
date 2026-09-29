@@ -15,7 +15,8 @@ permissions:
   contents: read
 
 env:
-  # Node's current Active LTS, and what the app is developed against.
+  # The Node the app is developed and tested against. `engines` in package.json
+  # holds the wider range that is supported; `@types/node` follows this major.
   NODE_VERSION: '24.x'
 
 jobs:
@@ -23,14 +24,16 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Before setup-node: the npm cache path is resolved by asking pnpm for its
       # store, so pnpm has to be on PATH first. No `version` here — it comes from
       # the `packageManager` field in package.json.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -43,11 +46,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm run format:check
 
-      - name: Lint (oxlint)
+      - name: Lint (oxlint --deny-warnings)
         if: ${{ !cancelled() }}
         run: pnpm run lint
 
-      - name: Typecheck (tsc --noEmit)
+      - name: Typecheck (tsc, both projects)
         if: ${{ !cancelled() }}
         run: pnpm run typecheck
 
@@ -55,11 +58,13 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -73,11 +78,13 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -93,7 +100,7 @@ jobs:
         run: test -s dist/repaint.html
 
       - name: Upload dist/
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist
           path: dist/

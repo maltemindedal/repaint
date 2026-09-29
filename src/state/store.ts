@@ -60,6 +60,22 @@ export class AppStore {
   private data: AppData;
   private sceneKey = '__fallback__';
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * What changed since the last save that reached storage. A save re-reads what is
+   * stored and overlays only these parts (see `persist`), so a tab never rewrites
+   * scenes or a library it did not touch.
+   */
+  private dirtyScenes = new Set<string>();
+  private libraryDirty = false;
+  /** An import that replaces everything: the next save writes this tab's data whole. */
+  private replaced = false;
+  private saveFailing = false;
+
+  /**
+   * Called when saving starts failing (storage full or blocked), so the app can
+   * say so. Not called again until a save has worked in between.
+   */
+  onSaveFailed: (() => void) | null = null;
 
   constructor(data: AppData = loadData()) {
     this.data = data;
@@ -72,21 +88,66 @@ export class AppStore {
    * longer one because they change on every camera move. A pending short-delay
    * save is never postponed by a lazy one.
    */
-  private queueSave(delay = 250): void {
+  private queueSave(scope: 'scene' | 'library', delay = 250): void {
+    if (scope === 'scene') this.dirtyScenes.add(this.sceneKey);
+    else this.libraryDirty = true;
     if (this.saveTimer) {
       if (delay > 250) return; // don't let a lazy save delay an eager one
       clearTimeout(this.saveTimer);
     }
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
-      saveData(this.data);
+      this.persist();
     }, delay);
   }
 
+  /**
+   * Writes any unsaved change now (page hide, import). A tab that changed
+   * nothing writes nothing: its in-memory data is a snapshot from when it
+   * opened, and saving that would overwrite what another tab has stored since.
+   */
   flush(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    saveData(this.data);
+    if (this.hasChanges()) this.persist();
+  }
+
+  private hasChanges(): boolean {
+    return this.replaced || this.libraryDirty || this.dirtyScenes.size > 0;
+  }
+
+  private persist(): void {
+    const saved = saveData(this.replaced ? this.data : this.mergedWithStored());
+    // A save that didn't reach storage stays pending for the next flush.
+    if (saved) {
+      this.dirtyScenes.clear();
+      this.libraryDirty = false;
+      this.replaced = false;
+    }
+    if (!saved && !this.saveFailing) this.onSaveFailed?.();
+    this.saveFailing = !saved;
+  }
+
+  /**
+   * What is stored right now, with this tab's changes laid over it. Other tabs
+   * share the one storage key, and this tab's data is a snapshot from when it
+   * opened, so writing it whole would undo whatever they saved since. Instead each
+   * scene this tab changed replaces that scene, and the library replaces the stored
+   * one only if this tab changed the library. Two tabs changing the same file, or
+   * both changing the library, are last-writer-wins for that part alone.
+   */
+  private mergedWithStored(): AppData {
+    const stored = loadData();
+    const merged: AppData = {
+      version: 1,
+      library: this.libraryDirty ? this.data.library : stored.library,
+      scenes: stored.scenes,
+    };
+    for (const key of this.dirtyScenes) {
+      const prefs = this.data.scenes[key];
+      if (prefs) merged.scenes[key] = prefs;
+    }
+    return merged;
   }
 
   // ----------------------------------------------------------------- scene
@@ -94,8 +155,10 @@ export class AppStore {
   useScene(key: string): void {
     this.sceneKey = key;
     if (!this.data.scenes[key]) {
+      // Not saved until something in it changes: an empty entry is the same as none,
+      // and saving it from a tab that opened before another tab saved this file would
+      // overwrite that tab's work.
       this.data.scenes[key] = emptyScenePrefs();
-      this.queueSave();
     } else {
       // Older saves may predate the 3-slot default.
       const prefs = this.data.scenes[key];
@@ -125,7 +188,7 @@ export class AppStore {
     // re-export that adds the PAINT_ prefix doesn't leave stale overrides.
     if (tagged && !autoDiscovered) prefs.tagged.push(materialName);
     if (!tagged && autoDiscovered) prefs.untagged.push(materialName);
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   // --------------------------------------------------------- live colours
@@ -136,12 +199,12 @@ export class AppStore {
 
   setCurrentColor(key: string, hex: string): void {
     this.scene.current[key] = hex;
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   clearCurrentColor(key: string): void {
     delete this.scene.current[key];
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   // -------------------------------------------------------------- schemes
@@ -156,21 +219,21 @@ export class AppStore {
 
   setActiveScheme(id: string | null): void {
     this.scene.activeSchemeId = id;
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   saveScheme(id: string, colors: Record<string, string>): void {
     const scheme = this.schemes.find((s) => s.id === id);
     if (!scheme) return;
     scheme.colors = { ...colors };
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   renameScheme(id: string, name: string): void {
     const scheme = this.schemes.find((s) => s.id === id);
     if (!scheme) return;
     scheme.name = name.trim() || scheme.name;
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   // -------------------------------------------------------------- library
@@ -183,25 +246,25 @@ export class AppStore {
     const normalized = normalizeHex(hex);
     if (!normalized) return null;
     const entry: LibraryColor = {
-      id: `lib-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`,
+      id: newLibraryId(),
       name: name.trim() || normalized.toUpperCase(),
       hex: normalized,
     };
     this.data.library.unshift(entry);
-    this.queueSave();
+    this.queueSave('library');
     return entry;
   }
 
   removeLibraryColor(id: string): void {
     this.data.library = this.data.library.filter((c) => c.id !== id);
-    this.queueSave();
+    this.queueSave('library');
   }
 
   renameLibraryColor(id: string, name: string): void {
     const entry = this.data.library.find((c) => c.id === id);
     if (!entry) return;
     entry.name = name.trim() || entry.name;
-    this.queueSave();
+    this.queueSave('library');
   }
 
   // ------------------------------------------------------- poses/settings
@@ -212,7 +275,7 @@ export class AppStore {
 
   setPose(mode: NavMode, pose: CameraPose): void {
     this.scene.poses[mode] = pose;
-    this.queueSave(800);
+    this.queueSave('scene', 800);
   }
 
   get settings(): SceneSettings {
@@ -221,7 +284,7 @@ export class AppStore {
 
   setSetting<K extends keyof SceneSettings>(key: K, value: SceneSettings[K]): void {
     this.scene.settings[key] = value;
-    this.queueSave();
+    this.queueSave('scene');
   }
 
   /**
@@ -245,16 +308,29 @@ export class AppStore {
     const incoming = migrate(JSON.parse(json));
     if (mode === 'replace') {
       this.data = incoming;
+      this.replaced = true;
     } else {
       const byHex = new Map(this.data.library.map((c) => [`${c.name}|${c.hex}`, c]));
+      const ids = new Set(this.data.library.map((c) => c.id));
       for (const c of incoming.library) {
-        if (!byHex.has(`${c.name}|${c.hex}`)) this.data.library.push(c);
+        if (byHex.has(`${c.name}|${c.hex}`)) continue;
+        // A colour renamed since the export arrives as new but with its old id.
+        let id = c.id;
+        while (ids.has(id)) id = newLibraryId();
+        ids.add(id);
+        this.data.library.push(id === c.id ? c : { ...c, id });
+        this.libraryDirty = true;
       }
       Object.assign(this.data.scenes, incoming.scenes);
+      for (const key of Object.keys(incoming.scenes)) this.dirtyScenes.add(key);
     }
     this.useScene(this.sceneKey);
     this.flush();
   }
+}
+
+function newLibraryId(): string {
+  return `lib-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
 }
 
 function dropFrom(list: string[], name: string): void {

@@ -4,7 +4,9 @@ Start with the two built-in diagnostics:
 
 - **The debug panel.** Press <kbd>`</kbd>. Mesh, triangle and texture counts,
   which compression is in use, whether a bake was detected, whether the file has
-  punctual lights, plus a live FPS meter.
+  punctual lights, plus a live FPS meter. While it is open the app draws every
+  frame so the meter means something; normally it draws only when something
+  changes.
 - **The console.** Every load writes a collapsed `[scene]` report with
   dimensions, material and texture counts, compression flags and warnings.
 
@@ -21,6 +23,16 @@ pnpm serve:dist
 
 Or build the double-clickable single file with `pnpm build:portable`. See
 [Deploying](deploying.md#the-portable-single-file-build).
+
+### "Repaint could not start"
+
+The app draws with WebGL 2, and the usual reason it cannot start is that the
+browser would not create a context. The page shows what the browser reported, and
+the console has the full error under `[boot] failed`. The usual causes of a missing
+context are hardware acceleration switched off in the browser's settings, a GPU or
+driver on the browser's blocklist, and remote-desktop or virtual-machine sessions
+without a GPU. Turn hardware acceleration on, update the graphics driver, and
+reload. If the message is about something else, it is a bug worth reporting.
 
 ### A compressed `.glb` fails to load from the portable file
 
@@ -43,6 +55,17 @@ name. Or re-export with the `PAINT_` prefix; see
 To see what the app actually found: **Scene → Log material report** in the debug
 panel prints every material with whether it is paintable, whether it came from
 the prefix, whether it carries a colour texture, and how many meshes use it.
+
+### A very large file freezes the tab or crashes it
+
+Repaint puts no limit on the size of a file or on its texture dimensions. It reads
+the whole file into memory and decodes every texture at full size, so a huge export
+(hundreds of megabytes, or textures of 8k pixels and up, which take hundreds of
+megabytes of GPU memory each) can exhaust memory and take the tab down. Nothing is
+lost when that happens (your saved colours are in `localStorage`, and the file is
+untouched), and there is no upload or server involved, so the only cost is the tab.
+Shrink the export first: lightmaps of 2K per room are usually plenty, and
+compression cuts a great deal (see [Performance](#performance)).
 
 ### The room is the wrong size, or the console warns about scene height
 
@@ -83,8 +106,11 @@ so the occlusion is multiplied in twice. Set **AO intensity** to 0.
 
 ## Performance
 
-Five seconds after a scene loads, if the frame rate is below 45 fps the app logs
-an actionable hint naming the actual cause. It checks, in order:
+The app draws a frame only while something is moving or has just changed, so a
+scene you are not touching costs nothing, and its frame rate is only measured
+while it is measured: for the five seconds after a scene loads, and while the debug
+panel is open. Five seconds after a scene loads, if the frame rate is below 45 fps
+the app logs an actionable hint naming the actual cause. It checks, in order:
 
 | Condition                        | Hint                                                                                    |
 | -------------------------------- | --------------------------------------------------------------------------------------- |
@@ -120,8 +146,12 @@ matters. See [Persistence](../reference/persistence.md).
 
 The app falls back to in-memory storage when `localStorage` is unavailable.
 Safari private mode has the API but throws on write. State then lasts only for
-the session. Save failures (including quota) are logged as
-`[storage] save failed (quota?)`.
+the session. When saving starts failing (a full quota, blocked site data, or
+that private mode) the app says so once in the status line. When the browser
+refuses a write (a full quota, or that private mode) it also logs
+`[storage] save failed (quota?)`; with site data blocked there is no storage to
+write to, so only the status line says so. Saved data that is already there is
+still read even when the browser will no longer accept writes.
 
 Corrupt saved data is not fatal: everything read back is validated field by field
 and anything malformed is dropped, with `[storage] could not read saved data,

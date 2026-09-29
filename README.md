@@ -14,7 +14,7 @@ machine. No backend, uploads, or analytics are involved. Your GLB is read with
 
 ## Quick start
 
-Requires **Node 24.x** and **pnpm 11.10.0** (pinned by `packageManager`; run
+Requires **Node ^22.13, ^24 or 26+** (CI and development use 24.x) and **pnpm 11.27.1** (pinned by `packageManager`; run
 `corepack enable`).
 
 ```bash
@@ -26,7 +26,7 @@ pnpm dev
 ```
 
 ```text
-  VITE v8.2.1  ready in 769 ms
+  VITE v8.3.0  ready in 769 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
@@ -103,7 +103,7 @@ Full index: **[docs/README.md](docs/README.md)**
 ```text
 src/          The app: rendering core, navigation, persisted state, plain-DOM UI
 test/         Headless node test suite; fixtures/ generates a sample GLB
-scripts/      make-portable.mjs, which folds dist/ into one HTML file
+scripts/      make-portable.mjs (folds dist/ into one HTML file), bake_export.py (headless Blender bake + export)
 docs/         All documentation (see the index above)
 ```
 
@@ -122,5 +122,6 @@ MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Malte Mindedal.
 
 `package.json` stays `"private": true` so the package is never published to npm
 by accident; that flag says nothing about the licence, which is MIT for the source
-and the docs alike. The runtime dependencies, three.js, lil-gui, and stats.js,
-are MIT too, so a `dist/` or `dist/repaint.html` build carries only MIT code.
+and the docs alike. The runtime dependencies, three.js and lil-gui, are MIT too
+(the fps meter is the copy of stats.js that ships inside three.js), so a `dist/`
+or `dist/repaint.html` build carries only MIT code.

@@ -96,5 +96,5 @@ source.
 | `test.environment`            | `node`              | The suite runs headless. `sidebar.test.ts` opts into happy-dom with a `@vitest-environment` docblock.         |
 | `test.include`                | `test/**/*.test.ts` |                                                                                                               |
 
-`pnpm-workspace.yaml` allows exactly one dependency build script: esbuild's
-postinstall, which unpacks the platform binary Vite and Vitest need.
+`pnpm-workspace.yaml` allows no dependency build scripts; nothing in the tree
+needs one.

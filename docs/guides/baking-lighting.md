@@ -102,6 +102,10 @@ Direct+Indirect with Cycles, and exports the `.glb` with the settings from
 [Preparing a Blender scene](preparing-a-blender-scene.md). The source `.blend`
 is never saved; bake PNGs land in `bakes/` next to the output for inspection.
 
+It has been run end to end on Blender 4.5 LTS, 5.0, 5.1 and 5.2 LTS. The script
+still carries a fallback for Blender 3.x's node-group API that has not been run
+on a current release.
+
 Options after the `--` (also via `-- --help`):
 
 | Flag                | Default       | Meaning                                                                                                                                                                                                                  |
@@ -113,7 +117,7 @@ Options after the `--` (also via `-- --help`):
 | `--island-margin F` | `0.03`        | Smart UV Project island spacing.                                                                                                                                                                                         |
 | `--min-size F`      | `0` (off)     | Skip baking objects smaller than F metres. They are still exported and lit by the environment. Objects sharing a material with a baked object are promoted into the bake instead (the bake image lives on the material). |
 | `--group-by MODE`   | `collection`  | `collection` or `single` (one atlas for everything).                                                                                                                                                                     |
-| `--gpu`             | off           | Bake on Metal/CUDA/OptiX/HIP if available.                                                                                                                                                                               |
+| `--gpu`             | off           | Bake on Metal/CUDA/OptiX/HIP/oneAPI if available.                                                                                                                                                                        |
 | `--draco`           | off           | Draco-compress the export.                                                                                                                                                                                               |
 | `--no-lights`       | off           | Leave punctual lights out of the `.glb`.                                                                                                                                                                                 |
 

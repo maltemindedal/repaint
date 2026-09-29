@@ -112,15 +112,21 @@ export class Picker {
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  /** The pointer moved: what is under it is worked out in the next frame. */
+  private markDirty(): void {
+    this.dirty = true;
+    this.viewer.invalidate();
+  }
+
   private handlePointerMove = (event: PointerEvent): void => {
     this.updatePointer(event);
     this.pointerInside = true;
-    this.dirty = true;
+    this.markDirty();
   };
 
   private handlePointerLeave = (): void => {
     this.pointerInside = false;
-    this.dirty = true;
+    this.markDirty();
   };
 
   private downAt = { x: 0, y: 0 };
@@ -210,14 +216,14 @@ export class Picker {
     this.viewer.canvas.classList.remove('hover-paintable');
   }
 
-  /** Drive from the render loop. */
-  update(dt: number): void {
+  /** Drive from the render loop. True while a selection pulse is still fading. */
+  update(dt: number): boolean {
     if (this.dirty) {
       this.dirty = false;
       this.setHovered(this.pointerInside ? this.pickPaintable() : null);
     }
 
-    if (!this.highlightsEnabled) return;
+    if (!this.highlightsEnabled) return false;
 
     // Hover: a barely-there lift so you can tell what is clickable.
     if (this.hovered && !this.pulse.has(this.hovered.key)) {
@@ -240,5 +246,6 @@ export class Picker {
       const wave = Math.abs(Math.sin(t * Math.PI * 2)) * t;
       this.applyEmissive(key, SELECT_PULSE * wave + HOVER_STRENGTH * (1 - t));
     }
+    return this.pulse.size > 0;
   }
 }

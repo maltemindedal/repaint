@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { must } from './helpers.ts';
 import {
   DataTexture,
@@ -150,6 +150,47 @@ describe('colour pipeline', () => {
     expect(target.currentHex).toBe('#e8e4da');
     // The value that actually reaches the GPU must read back as the same sRGB hex.
     expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe('e8e4da');
+  });
+
+  it('accepts any colour three can parse, not just hex', () => {
+    const { registry } = buildScene();
+    const target = registry.get('PAINT_Living_North')!;
+
+    expect(registry.setColor(target.key, 'red')).toBe(true);
+    expect(target.currentHex).toBe('#ff0000');
+    expect(registry.setColor(target.key, '#0f0')).toBe(true);
+    expect(target.currentHex).toBe('#00ff00');
+  });
+
+  it('refuses a colour it cannot parse instead of repeating the previous wall colour', () => {
+    const { registry } = buildScene();
+    const north = registry.get('PAINT_Living_North')!;
+    const east = registry.get('PAINT_Living_East')!;
+    const eastBefore = east.currentHex;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Leaves a colour behind in the registry's scratch value for the next call.
+    registry.setColor(north.key, '#ff0000');
+    for (const bad of ['banana', 'E8E4DA', '', 'red;background-image:url(x)']) {
+      expect(registry.setColor(east.key, bad)).toBe(false);
+      expect(east.currentHex).toBe(eastBefore);
+      expect(must(east.materials[0]).color.getHexString(SRGBColorSpace)).toBe(eastBefore.slice(1));
+    }
+    warn.mockRestore();
+  });
+
+  it('skips unparseable scheme colours and counts only what it painted', () => {
+    const { registry } = buildScene();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const applied = registry.applyScheme({
+      PAINT_Living_North: 'banana',
+      PAINT_Living_East: '#00ff00',
+    });
+
+    expect(applied).toBe(1);
+    expect(registry.get('PAINT_Living_East')!.currentHex).toBe('#00ff00');
+    warn.mockRestore();
   });
 
   it('never invalidates the shader program on a colour change', () => {
@@ -310,6 +351,32 @@ describe('persistence', () => {
     expect(restored.settings.exposure).toBe(1.4);
   });
 
+  it('merges a library without duplicating what it already has', () => {
+    const store = new AppStore(emptyData());
+    store.addLibraryColor('Chalk', '#f2f0eb');
+    const json = store.exportJSON();
+
+    store.importJSON(json, 'merge');
+
+    expect(store.library.map((c) => c.name)).toEqual(['Chalk']);
+  });
+
+  it('gives a merged library colour a new id when its id is already taken', () => {
+    const store = new AppStore(emptyData());
+    const chalk = must(store.addLibraryColor('Chalk', '#f2f0eb'));
+    const exported = store.exportJSON();
+    // Renaming after the export means the old name|hex no longer matches, so the
+    // exported copy is a genuinely new entry that arrives with the same id.
+    store.renameLibraryColor(chalk.id, 'Chalk (hall)');
+
+    store.importJSON(exported, 'merge');
+
+    expect(store.library.map((c) => c.name).toSorted()).toEqual(['Chalk', 'Chalk (hall)']);
+    expect(new Set(store.library.map((c) => c.id)).size).toBe(2);
+    store.removeLibraryColor(chalk.id);
+    expect(store.library.map((c) => c.name)).toEqual(['Chalk']);
+  });
+
   it('lets a guess fill a setting the user has not decided, and only that', () => {
     const store = new AppStore(emptyData());
     store.useScene('apartment.glb');
@@ -322,6 +389,66 @@ describe('persistence', () => {
     store.setSetting('aoMapIntensity', 0);
     store.setDefaultSetting('aoMapIntensity', 1);
     expect(store.settings.aoMapIntensity).toBe(0);
+  });
+
+  it('keeps only #rgb and #rrggbb colours, exactly as written', () => {
+    const injection = 'red;background-image:url(https://tracker.example/p.png)';
+    const data = migrate({
+      version: 1,
+      library: [
+        { id: 'a', name: 'Upper', hex: '#F2F0EB' },
+        { id: 'b', name: 'Bare', hex: 'F2F0EB' },
+        { id: 'c', name: 'Named', hex: 'red' },
+        { id: 'd', name: 'Evil', hex: injection },
+        { id: 'e', name: 'Short', hex: '#abc' },
+        { id: 'f', name: 'Four', hex: '#abcd' },
+        { id: 'g', name: 'NotHex', hex: '#ggg' },
+        { id: 'h', name: 'Padded', hex: ' #abc ' },
+      ],
+      scenes: {
+        'x.glb': {
+          schemes: [
+            {
+              id: 'slot-1',
+              name: 'S',
+              colors: { PAINT_A: injection, PAINT_B: '#fff', PAINT_C: 'red', PAINT_D: 'e8e4da' },
+            },
+          ],
+          current: { PAINT_A: 'url(https://tracker.example/p.png)', PAINT_B: '#E8E4DA' },
+        },
+      },
+    });
+
+    expect(data.library.map((c) => c.hex)).toEqual(['#F2F0EB', '#abc']);
+    const scene = must(data.scenes['x.glb']);
+    expect(must(scene.schemes[0]).colors).toEqual({ PAINT_B: '#fff' });
+    expect(scene.current).toEqual({ PAINT_B: '#E8E4DA' });
+  });
+
+  it('does not touch Object.prototype for a __proto__ scene key', () => {
+    const data = migrate(JSON.parse('{"version":1,"scenes":{"__proto__":{"polluted":true}}}'));
+
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(Object.keys(data.scenes)).toEqual([]);
+  });
+
+  it('repairs library entries that share an id, so removing one keeps the other', () => {
+    const data = migrate({
+      version: 1,
+      library: [
+        { id: 'lib-a', name: 'Chalk', hex: '#f2f0eb' },
+        { id: 'lib-a', name: 'Chalk (hall)', hex: '#f2f0eb' },
+        { id: 'lib-b', name: 'Sage', hex: '#a3b18a' },
+      ],
+    });
+
+    expect(data.library.map((c) => c.name)).toEqual(['Chalk', 'Chalk (hall)', 'Sage']);
+    expect(new Set(data.library.map((c) => c.id)).size).toBe(3);
+    // The first holder keeps the id it had, and unique ids are untouched.
+    expect(data.library.map((c) => c.id).filter((id) => id === 'lib-a' || id === 'lib-b')).toEqual([
+      'lib-a',
+      'lib-b',
+    ]);
   });
 
   it('always hands back three keyboard-addressable scheme slots', () => {

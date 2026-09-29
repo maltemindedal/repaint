@@ -19,13 +19,13 @@ Every script in `package.json`, what it actually runs, and when you want it.
 
 ## Quality
 
-| Script              | Runs                                      | Notes                                                                    |
-| ------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| `pnpm check`        | `tsc --noEmit && oxlint && oxfmt --check` | Everything CI's Check job runs, in one command. Use this before pushing. |
-| `pnpm typecheck`    | `tsc --noEmit`                            |                                                                          |
-| `pnpm lint`         | `oxlint`                                  | Config in `.oxlintrc.json`.                                              |
-| `pnpm format`       | `oxfmt`                                   | Formats in place.                                                        |
-| `pnpm format:check` | `oxfmt --check`                           | Fails instead of writing. Config in `.oxfmtrc.json`.                     |
+| Script              | Runs                                                                                      | Notes                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm check`        | `tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint --deny-warnings && oxfmt --check` | Everything CI's Check job runs, in one command. Use this before pushing.      |
+| `pnpm typecheck`    | `tsc --noEmit && tsc -p tsconfig.scripts.json`                                            |                                                                               |
+| `pnpm lint`         | `oxlint --deny-warnings`                                                                  | Config in `.oxlintrc.json`. Warnings fail the run, so the tree stays at zero. |
+| `pnpm format`       | `oxfmt`                                                                                   | Formats in place.                                                             |
+| `pnpm format:check` | `oxfmt --check`                                                                           | Fails instead of writing. Config in `.oxfmtrc.json`.                          |
 
 Unlike `pnpm check`, CI runs the three checks as separate steps guarded with
 `if: ${{ !cancelled() }}`, so one run reports every problem rather than stopping
@@ -47,12 +47,12 @@ at the first.
 
 ## Toolchain versions
 
-| Tool           | Version           | Pinned by                                                                                              |
-| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
-| Node           | 24.x              | `NODE_VERSION` in `.github/workflows/ci.yml`. No `engines` field enforces it locally.                  |
-| pnpm           | 11.10.0           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
-| TypeScript     | ^5.9.2            | `package.json`                                                                                         |
-| Vite           | ^8.2.1            | `package.json`                                                                                         |
-| Vitest         | ^3.2.4            | `package.json`                                                                                         |
-| three.js       | ^0.185.1          | `package.json`                                                                                         |
-| oxlint / oxfmt | ^1.78.0 / ^0.63.0 | `package.json`                                                                                         |
+| Tool           | Version                   | Pinned by                                                                                                               |
+| -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Node           | ^22.13 \|\| ^24 \|\| >=26 | `engines` in `package.json`. CI runs 24.x (`NODE_VERSION` in `.github/workflows/ci.yml`), and `@types/node` follows it. |
+| pnpm           | 11.27.1                   | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately.                  |
+| TypeScript     | ^7.0.2                    | `package.json`                                                                                                          |
+| Vite           | ^8.3.0                    | `package.json`                                                                                                          |
+| Vitest         | ^5.0.1                    | `package.json`                                                                                                          |
+| three.js       | ^0.185.1                  | `package.json`                                                                                                          |
+| oxlint / oxfmt | ^1.85.0 / ^0.70.0         | `package.json`                                                                                                          |

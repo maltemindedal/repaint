@@ -1,4 +1,4 @@
-import { el, clear } from '../util/dom.ts';
+import { colorEl, el, clear } from '../util/dom.ts';
 import { ColorPicker } from './ColorPicker.ts';
 import { miniSwatches } from './swatches.ts';
 import type { LibraryColor, MaterialInfo, SchemeView } from '../types.ts';
@@ -460,9 +460,8 @@ export class Sidebar {
 
       list.appendChild(
         el('div', { class: 'lib-item' }, [
-          el('div', {
+          colorEl('div', entry.hex, {
             class: 'swatch',
-            style: `background:${entry.hex}`,
             title: `Apply ${entry.hex.toUpperCase()} to the selected wall`,
             onclick: () => this.cb.onApplyLibraryColor(entry.id),
           }),

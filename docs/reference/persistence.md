@@ -13,9 +13,10 @@ apartment-walkthrough:v1
 That is the pre-rename key, kept as-is so schemes and libraries saved before the
 app was called Repaint still load (`STORAGE_KEY` in `src/state/storage.ts`).
 
-If `localStorage` is unavailable, as in Safari private mode where the API throws on
-write, the app falls back to an in-memory store, and state lasts
-only for the session.
+If `localStorage` is unavailable or refuses a write (a full quota, blocked site data,
+or Safari private mode where the API throws on write), the app falls back to an
+in-memory store, and state lasts only for the session. It says so once in the
+status line when saving starts failing; data already saved is still read.
 
 ## Scope: per scene, keyed by file name
 
@@ -60,11 +61,24 @@ Writes are debounced, because dragging a colour picker fires a lot of them.
 | ------------ | ------------------------------------------- |
 | Most changes | 250 ms                                      |
 | Camera poses | 800 ms. They change on every frame you move |
-| `pagehide`   | Immediate flush                             |
+| `pagehide`   | Immediate flush of any unsaved change       |
 
 A pending short-delay save is never postponed by a lazy one. In walk mode the
 pose is only written once the camera has been still for 0.5 s, so walking
 somewhere is persisted rather than saved a hundred times on the way.
+
+## Several tabs
+
+Every tab shares the one storage key. A tab keeps track of what _it_ changed (which
+files' scenes, and whether the colour library) and each save re-reads what is stored
+and lays only those parts over it. So a tab never rewrites scenes or a library it did
+not touch, and a tab that changed nothing writes nothing, including when it closes.
+Opening a file writes nothing either, until something in its scene changes.
+
+Two limits remain, and both are last-writer-wins: two tabs on the **same file** (the
+demo room counts) overwrite each other's scene as a whole, and if two tabs both change
+the **colour library**, the later save wins for the library. A **replacing** import
+overwrites everything, as it always did.
 
 ## Export and import
 
@@ -112,8 +126,10 @@ checked on the way in rather than blind-cast (`migrate()` in
 `src/state/storage.ts`). Anything that doesn't hold its shape is dropped, never
 propagated:
 
-- Scheme entries need a string `id` and `name`; colour maps keep only string
-  values.
+- Scheme entries need a string `id` and `name`. Colours (in colour maps and the
+  library) must be `#rgb` or `#rrggbb`, and are kept as written; anything else
+  (`red`, `rgb(…)`, a bare `e8e4da`, or a string carrying extra CSS) is dropped.
+  The app itself only ever writes `#rrggbb`, so only a hand-edited file is affected.
 - Poses need `position` and `target` as three finite numbers each, or the mode is
   dropped.
 - Settings keep only known keys whose values have the expected type. A finite

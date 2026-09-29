@@ -56,6 +56,11 @@ export class WalkMotion {
   private quietFor = 0;
   private poseDirty = false;
 
+  /** True from the first movement until `onPoseSettled` has fired: `update` still has to be called. */
+  get settling(): boolean {
+    return this.poseDirty;
+  }
+
   /** Fired once the pose has settled after movement. */
   onPoseSettled: (() => void) | null = null;
 

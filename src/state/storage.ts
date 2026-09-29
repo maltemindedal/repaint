@@ -1,31 +1,30 @@
 import type { AppData } from '../types.ts';
+import { isHexColor } from '../util/color.ts';
 
 // Historical key from before the app was renamed to Repaint. Keep it so
 // existing saved schemes and libraries survive the rename.
 export const STORAGE_KEY = 'apartment-walkthrough:v1';
 
 /**
- * localStorage with an in-memory fallback so the same code path works under
- * `vitest` (node, no DOM) and in private-browsing modes where localStorage
- * throws on write.
+ * localStorage, with an in-memory copy for whatever it would not take. That keeps
+ * the same code path working under `vitest` (node, no DOM) and where the browser
+ * refuses writes (a full quota, or an old Safari private window whose API exists
+ * but throws on `setItem`): the session still sees its own changes, they just
+ * don't outlive the tab.
  */
 const memory = new Map<string, string>();
 
-function backend(): Pick<Storage, 'getItem' | 'setItem'> {
+/** True while saves are failing, so the console hears about it once per episode. */
+let failing = false;
+
+/** `localStorage`, or null where it doesn't exist or the browser denies access to it. */
+function local(): Storage | null {
   try {
-    if (typeof localStorage !== 'undefined') {
-      // Probe: Safari private mode has the API but throws on setItem.
-      localStorage.setItem(`${STORAGE_KEY}:probe`, '1');
-      localStorage.removeItem(`${STORAGE_KEY}:probe`);
-      return localStorage;
-    }
+    return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
-    /* fall through to memory */
+    // With site data blocked, merely reading the property throws a SecurityError.
+    return null;
   }
-  return {
-    getItem: (k) => memory.get(k) ?? null,
-    setItem: (k, v) => void memory.set(k, v),
-  };
 }
 
 export function emptyData(): AppData {
@@ -34,7 +33,8 @@ export function emptyData(): AppData {
 
 export function loadData(): AppData {
   try {
-    const raw = backend().getItem(STORAGE_KEY);
+    // A copy in memory is newer than storage: it holds a save storage refused.
+    const raw = memory.get(STORAGE_KEY) ?? local()?.getItem(STORAGE_KEY);
     if (!raw) return emptyData();
     return migrate(JSON.parse(raw));
   } catch (err) {
@@ -43,12 +43,30 @@ export function loadData(): AppData {
   }
 }
 
-export function saveData(data: AppData): void {
+/**
+ * Persists the data. Returns whether it reached `localStorage`; false means it
+ * lives in this session only (storage full, blocked, or absent).
+ */
+export function saveData(data: AppData): boolean {
   try {
-    backend().setItem(STORAGE_KEY, JSON.stringify(data));
+    const json = JSON.stringify(data);
+    const store = local();
+    if (store) {
+      try {
+        store.setItem(STORAGE_KEY, json);
+        memory.delete(STORAGE_KEY);
+        failing = false;
+        return true;
+      } catch (err) {
+        if (!failing) console.warn('[storage] save failed (quota?)', err);
+        failing = true;
+      }
+    }
+    memory.set(STORAGE_KEY, json);
   } catch (err) {
-    console.warn('[storage] save failed (quota?)', err);
+    console.warn('[storage] could not serialise saved data', err);
   }
+  return false;
 }
 
 // ------------------------------------------------------------- validation
@@ -61,11 +79,12 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
-function stringRecord(value: unknown): Record<string, string> {
+/** A material name -> colour map. Colours are kept as written, but only if they are `#rgb` or `#rrggbb`. */
+function colorRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(value)) {
-    if (typeof v === 'string') out[k] = v;
+    if (typeof v === 'string' && isHexColor(v)) out[k] = v;
   }
   return out;
 }
@@ -79,7 +98,7 @@ function schemeList(value: unknown): AppData['scenes'][string]['schemes'] {
     const id = s['id'];
     const name = s['name'];
     if (typeof id !== 'string' || typeof name !== 'string') continue;
-    out.push({ id, name, colors: stringRecord(s['colors']) });
+    out.push({ id, name, colors: colorRecord(s['colors']) });
   }
   return out;
 }
@@ -137,13 +156,19 @@ export function migrate(input: unknown): AppData {
   const raw = input as Partial<AppData>;
 
   if (Array.isArray(raw.library)) {
+    // The id is the only handle the UI has on an entry (remove, rename), so two
+    // entries sharing one would be removed and renamed together. An earlier merge
+    // import could write such data; the first holder keeps its id.
+    const taken = new Set<string>();
     data.library = raw.library
-      .filter((c) => c && typeof c.hex === 'string')
-      .map((c, i) => ({
-        id: typeof c.id === 'string' ? c.id : `lib-${i}-${c.hex}`,
-        name: typeof c.name === 'string' && c.name ? c.name : c.hex,
-        hex: c.hex,
-      }));
+      .filter((c) => c && typeof c.hex === 'string' && isHexColor(c.hex))
+      .map((c, i) => {
+        const wanted = typeof c.id === 'string' ? c.id : `lib-${i}-${c.hex}`;
+        let id = wanted;
+        for (let n = 2; taken.has(id); n++) id = `${wanted}-${n}`;
+        taken.add(id);
+        return { id, name: typeof c.name === 'string' && c.name ? c.name : c.hex, hex: c.hex };
+      });
   }
 
   if (raw.scenes && typeof raw.scenes === 'object') {
@@ -158,7 +183,7 @@ export function migrate(input: unknown): AppData {
         activeSchemeId: typeof activeSchemeId === 'string' ? activeSchemeId : null,
         poses: poseMap(p['poses']),
         settings: settingsPatch(p['settings']),
-        current: stringRecord(p['current']),
+        current: colorRecord(p['current']),
       };
     }
   }

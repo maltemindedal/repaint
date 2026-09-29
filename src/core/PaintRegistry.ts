@@ -192,11 +192,19 @@ export class PaintRegistry {
    * Deliberately does **not** touch `material.needsUpdate`: writing a uniform
    * value never invalidates the program cache key, so recolouring costs a
    * uniform upload and nothing more. No shader recompiles, no frame hitch.
+   *
+   * Returns false, leaving the wall untouched, for an unknown key or a colour
+   * three cannot parse.
    */
   setColor(key: string, hex: string): boolean {
     const target = this.targets.get(key);
     if (!target) return false;
+    // `setStyle` leaves the colour as it was when it cannot parse the string, so
+    // without a marker a bad value (saved data can hold anything) would paint this
+    // wall with whatever an earlier call left in `scratch`: another wall's colour.
+    this.scratch.setRGB(-1, -1, -1);
     this.scratch.setStyle(hex, SRGBColorSpace);
+    if (this.scratch.r < 0) return false;
     for (const mat of target.materials) mat.color.copy(this.scratch);
     target.currentHex = hexOf(this.scratch);
     return true;

@@ -1,4 +1,4 @@
-import { Box3, PerspectiveCamera, Vector3 } from 'three';
+import { Box3, PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { WalkControls } from './WalkControls.ts';
 import { WalkMotion } from './WalkMotion.ts';
@@ -13,6 +13,27 @@ export interface NavHost {
   readonly camera: PerspectiveCamera;
   readonly canvas: HTMLElement;
 }
+
+/**
+ * How far the camera must move in one frame to count as moving: 1e-6 m (the
+ * threshold is squared), and a turn of about 9e-6 rad (`1 - |dot|` of two
+ * orientations is about an eighth of the angle squared). Both are far below a
+ * pixel at any distance the viewer allows, so a camera easing to a stop is drawn
+ * until nobody could see it move, and no longer.
+ */
+const MOVE_EPSILON = 1e-12;
+const TURN_EPSILON = 1e-11;
+
+const ORBIT_DAMPING = 0.075;
+/**
+ * OrbitControls keeps its damping inertia (what a flick leaves behind) and only
+ * spends it inside `update()`, by (1 - damping) each call. Against a polar limit the
+ * camera does not move while that happens, so "the camera moved" cannot tell that
+ * inertia is left: it would be frozen, then subtracted from the next drag. So after
+ * a gesture, and for as long as one is held, `update()` keeps being called until
+ * the inertia is down to about 1e-5 of what it was.
+ */
+const ORBIT_COAST_FRAMES = Math.ceil(Math.log(1e-5) / Math.log(1 - ORBIT_DAMPING));
 
 /**
  * Owns both navigation modes and the hand-off between them.
@@ -36,13 +57,21 @@ export class NavigationController {
   /** Smooth double-click retarget. */
   private targetAnim: { from: Vector3; to: Vector3; t: number } | null = null;
 
+  /** The camera as of the last `update`, to tell whether it is still moving. */
+  private lastPosition: Vector3;
+  private lastQuaternion: Quaternion;
+  /** Between OrbitControls' `start` and `end`: a pointer is down or a wheel is turning. */
+  private orbitGesture = false;
+  /** Updates left to spend on the inertia a finished gesture leaves behind. */
+  private orbitCoastFrames = 0;
+
   onModeChange: ((mode: NavMode) => void) | null = null;
   onPoseChange: ((mode: NavMode, pose: CameraPose) => void) | null = null;
 
   constructor(private host: NavHost) {
     this.orbit = new OrbitControls(host.camera, host.canvas);
     this.orbit.enableDamping = true;
-    this.orbit.dampingFactor = 0.075;
+    this.orbit.dampingFactor = ORBIT_DAMPING;
     this.orbit.rotateSpeed = 0.55;
     this.orbit.zoomSpeed = 0.8;
     this.orbit.panSpeed = 0.7;
@@ -56,7 +85,17 @@ export class NavigationController {
     this.walkInput = new WalkControls(this.walk, host.canvas);
     this.walkInput.enabled = false;
 
-    this.orbit.addEventListener('end', () => this.emitPose());
+    this.lastPosition = host.camera.position.clone();
+    this.lastQuaternion = host.camera.quaternion.clone();
+
+    this.orbit.addEventListener('start', () => {
+      this.orbitGesture = true;
+    });
+    this.orbit.addEventListener('end', () => {
+      this.orbitGesture = false;
+      this.orbitCoastFrames = ORBIT_COAST_FRAMES;
+      this.emitPose();
+    });
     this.walk.onPoseSettled = () => this.emitPose();
   }
 
@@ -80,6 +119,8 @@ export class NavigationController {
 
     if (mode === 'walk') {
       this.orbit.enabled = false;
+      this.orbitGesture = false;
+      this.orbitCoastFrames = 0;
       this.walkInput.enabled = true;
       // Stands at eye height where the camera already is. Walk mode owns that
       // arithmetic, so it isn't repeated out here.
@@ -190,7 +231,13 @@ export class NavigationController {
 
   // --------------------------------------------------------------- frame
 
-  update(dt: number): void {
+  /**
+   * Advances the camera one frame. True while it still has somewhere to go: the
+   * camera moved since the last frame, a double-click retarget is under way, orbit
+   * is holding or still spending inertia, or walk mode is waiting out the pause
+   * before it reports where you stopped.
+   */
+  update(dt: number): boolean {
     if (this.targetAnim) {
       const anim = this.targetAnim;
       anim.t = Math.min(1, anim.t + dt * 3.2);
@@ -211,5 +258,40 @@ export class NavigationController {
     } else {
       this.walk.update(dt);
     }
+
+    // Each is evaluated every frame (no short-circuit): both keep a count or a snapshot.
+    const moved = this.cameraMoved();
+    const inertia = this.orbitSpendingInertia();
+    return (
+      moved ||
+      this.targetAnim !== null ||
+      inertia ||
+      // `walk.update` only runs in walk mode, so that is the only place its
+      // settle timer can finish; left in orbit mode it would never sleep.
+      (this._mode === 'walk' && this.walk.settling)
+    );
+  }
+
+  private orbitSpendingInertia(): boolean {
+    if (this._mode !== 'orbit') return false;
+    if (this.orbitGesture) return true;
+    if (this.orbitCoastFrames === 0) return false;
+    this.orbitCoastFrames--;
+    return true;
+  }
+
+  /**
+   * Whether the camera differs from the last frame's. `OrbitControls.update()`
+   * answers a similar question, but with a threshold coarse enough that a damped
+   * orbit would be called finished while it still had a little way to drift.
+   */
+  private cameraMoved(): boolean {
+    const camera = this.host.camera;
+    const moved =
+      camera.position.distanceToSquared(this.lastPosition) > MOVE_EPSILON ||
+      1 - Math.abs(camera.quaternion.dot(this.lastQuaternion)) > TURN_EPSILON;
+    this.lastPosition.copy(camera.position);
+    this.lastQuaternion.copy(camera.quaternion);
+    return moved;
   }
 }

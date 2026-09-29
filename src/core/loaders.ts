@@ -1,4 +1,4 @@
-import type { WebGLRenderer } from 'three';
+import { LoadingManager, type CompressedTexture, type WebGLRenderer } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
@@ -22,13 +22,49 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 let draco: DRACOLoader | null = null;
 let ktx2: KTX2Loader | null = null;
 
+/**
+ * A dropped file is read with `FileReader` and handed over as bytes, so the only
+ * resources it can legitimately reference are ones embedded in it (`data:`) or
+ * that GLTFLoader itself builds from a bufferView (`blob:`). Any other `uri` in
+ * the glTF JSON would make the tab request a third-party address on the file's
+ * say-so, which the README promises never happens, so it is refused.
+ */
+const EMBEDDED_URI = /^(?:data|blob):/i;
+
+// `about:blank` cannot be fetched, so a refused resource fails the way a 404 does.
+const embeddedOnly = (url: string): string => (EMBEDDED_URI.test(url) ? url : 'about:blank');
+
+export function embeddedOnlyManager(): LoadingManager {
+  const manager = new LoadingManager();
+  manager.setURLModifier(embeddedOnly);
+  return manager;
+}
+
+/**
+ * GLTFLoader hands a `KHR_texture_basisu` image straight to KTX2Loader.load(), so
+ * the glTF's own URL for a texture would bypass the manager above. The restriction
+ * cannot simply be a manager on this loader either: it also fetches its own
+ * transcoder through its manager, and that must keep working. So only the URL of
+ * the texture being loaded is checked.
+ */
+export class EmbeddedOnlyKTX2Loader extends KTX2Loader {
+  override load(
+    url: string,
+    onLoad: (texture: CompressedTexture) => void,
+    onProgress?: (event: ProgressEvent) => void,
+    onError?: (error: unknown) => void,
+  ): void {
+    super.load(embeddedOnly(url), onLoad, onProgress, onError);
+  }
+}
+
 export function createGLTFLoader(renderer: WebGLRenderer): GLTFLoader {
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader(embeddedOnlyManager());
 
   draco ??= new DRACOLoader();
   loader.setDRACOLoader(draco);
 
-  ktx2 ??= new KTX2Loader();
+  ktx2 ??= new EmbeddedOnlyKTX2Loader();
   // detectSupport needs the live renderer to choose a transcode target
   // (ASTC / ETC / BC / uncompressed fallback) for this GPU.
   ktx2.detectSupport(renderer);

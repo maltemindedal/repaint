@@ -1,6 +1,6 @@
 import './style.css';
 import { Viewer } from './core/Viewer.ts';
-import { SceneLoader } from './core/SceneLoader.ts';
+import { LoadSuperseded, SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
 import { PaintController } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
@@ -11,13 +11,14 @@ import { Sidebar } from './ui/Sidebar.ts';
 import { sidebarViewModel } from './sidebarViewModel.ts';
 import { Toolbar } from './ui/Toolbar.ts';
 import { DropZone } from './ui/DropZone.ts';
-import { DebugPanel } from './ui/DebugPanel.ts';
+import { DebugPanel, LazyDebugPanel } from './ui/DebugPanel.ts';
 import { HelpOverlay } from './ui/HelpOverlay.ts';
 import { StatusPanel } from './ui/StatusPanel.ts';
 import { bootWhenSupported } from './ui/MobileGate.ts';
 import {
   downloadBlob,
   downloadText,
+  ignoreKeyRepeat,
   isTypingTarget,
   requireElement,
   pickFile,
@@ -43,7 +44,12 @@ class App {
 
   private sidebar: Sidebar;
   private toolbar: Toolbar;
-  private debug: DebugPanel;
+  // Built on the first backtick press. See LazyDebugPanel.
+  private debug = new LazyDebugPanel(() => {
+    const panel = new DebugPanel(this.debugHooks());
+    panel.mount(requireElement('viewport'));
+    return panel;
+  });
   private help: HelpOverlay;
 
   private selectedKey: string | null = null;
@@ -109,8 +115,6 @@ class App {
     });
 
     this.help = new HelpOverlay(requireElement('help'));
-    this.debug = new DebugPanel(this.debugHooks());
-    this.debug.mount(requireElement('viewport'));
 
     new DropZone(requireElement('dropzone'), (file) => void this.handleFile(file));
 
@@ -130,15 +134,29 @@ class App {
     this.nav.onPoseChange = (mode, pose) => this.store.setPose(mode, pose);
     this.nav.walk.onEyeHeightChange = (value) => this.storeEyeHeight(value);
 
+    // Deferred a microtask: an import saves immediately, and the "Imported ..." toast
+    // its caller shows in the same tick would otherwise replace this, which is said only once.
+    this.store.onSaveFailed = () =>
+      queueMicrotask(() =>
+        this.panel.status(
+          'Your changes could not be saved (browser storage is full or blocked) and will be lost when this tab closes.',
+          10000,
+        ),
+      );
+
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pagehide', () => this.store.flush());
 
+    // Frames are drawn on demand. These two keep them coming for as long as the
+    // FPS meter is on screen, and while the first seconds of a scene are being timed.
+    this.viewer.keepAlive = () => this.debug.isVisible || this.sceneToTime !== null;
     this.viewer.onFrame((dt) => {
       this.debug.beginFrame();
-      this.nav.update(dt);
-      this.picker.update(dt);
+      const navMoving = this.nav.update(dt);
+      const pickerMoving = this.picker.update(dt);
       this.checkPerformance();
       this.debug.endFrame();
+      return navMoving || pickerMoving;
     });
 
     this.setScene(this.loader.loadFallback());
@@ -175,6 +193,7 @@ class App {
     }
 
     this.panel.showLoading(0, 'Reading file…');
+    let replaced = false;
     try {
       const scene = await this.loader.loadFile(file, (fraction, label) =>
         this.panel.showLoading(fraction, label),
@@ -185,6 +204,11 @@ class App {
         5000,
       );
     } catch (err) {
+      if (err instanceof LoadSuperseded) {
+        // A newer request owns the overlay and the scene now.
+        replaced = true;
+        return;
+      }
       console.error('[load] failed', err);
       if (location.protocol === 'file:') {
         console.warn(
@@ -194,7 +218,7 @@ class App {
       }
       this.panel.status(`Could not load ${file.name}. See the console for details.`, 6000);
     } finally {
-      this.panel.hideLoading();
+      if (!replaced) this.panel.hideLoading();
     }
   }
 
@@ -308,6 +332,8 @@ class App {
    * can't disagree about which scheme is live.
    */
   private render(): void {
+    // Nearly every mutation ends here, and most of them change the picture.
+    this.viewer.invalidate();
     const vm = sidebarViewModel({
       scene: this.scene,
       registry: this.registry,
@@ -320,7 +346,7 @@ class App {
   }
 
   private refreshAll(): void {
-    this.session.rediscover();
+    this.session.rediscover({ resetPaint: true });
     this.applyStoredSettings();
     this.render();
   }
@@ -341,6 +367,9 @@ class App {
 
   private applySettings(): void {
     const s = this.store.settings;
+    // Light-map and light settings below change materials and lights the viewer
+    // never hears about.
+    this.viewer.invalidate();
     this.viewer.setExposure(s.exposure);
     this.viewer.setToneMapping(s.toneMapping);
     this.viewer.setEnvIntensity(s.envIntensity);
@@ -469,6 +498,11 @@ class App {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (isTypingTarget(event.target)) return;
 
+    // Every action below is one-shot. A held key auto-repeats, and a repeat of
+    // T, Tab, Backquote or P would flip tone mapping, the mode or the debug panel
+    // over and over, or download many PNGs.
+    if (ignoreKeyRepeat(event)) return;
+
     switch (event.code) {
       case 'Tab':
         event.preventDefault();
@@ -519,24 +553,36 @@ class App {
 
   // ---------------------------------------------------------- screenshot
 
-  private async screenshot(): Promise<void> {
-    const scheme = this.store.schemes.find((s) => s.id === this.store.activeSchemeId);
-    const slug =
-      (scheme?.name ?? 'custom')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '') || 'custom';
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  private screenshotting = false;
 
-    this.panel.status('Rendering 2× screenshot…');
-    const blob = await this.viewer.screenshot(2);
-    if (!blob) {
-      this.panel.status('Screenshot failed. The drawing buffer came back empty.', 4000);
-      return;
+  private async screenshot(): Promise<void> {
+    // A double click or a held key must not start a second capture.
+    if (this.screenshotting) return;
+    this.screenshotting = true;
+    try {
+      const scheme = this.store.schemes.find((s) => s.id === this.store.activeSchemeId);
+      const slug =
+        (scheme?.name ?? 'custom')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'custom';
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+      this.panel.status('Rendering 2× screenshot…');
+      const blob = await this.viewer.screenshot(2);
+      if (!blob) {
+        this.panel.status('Screenshot failed. The drawing buffer came back empty.', 4000);
+        return;
+      }
+      const filename = `repaint_${slug}_${stamp}.png`;
+      downloadBlob(blob, filename);
+      this.panel.status(`Saved ${filename}`, 4000);
+    } catch (err) {
+      console.error('[screenshot] failed', err);
+      this.panel.status('Screenshot failed. See the console for details.', 4000);
+    } finally {
+      this.screenshotting = false;
     }
-    const filename = `repaint_${slug}_${stamp}.png`;
-    downloadBlob(blob, filename);
-    this.panel.status(`Saved ${filename}`, 4000);
   }
 
   // -------------------------------------------------------- import/export
@@ -562,19 +608,25 @@ class App {
 
   // -------------------------------------------------------- perf & status
 
+  /** The loaded scene, until its frame rate has been judged. Null for the demo room. */
+  private get sceneToTime(): LoadedScene | null {
+    return !this.perfChecked && this.scene && !this.scene.isFallback ? this.scene : null;
+  }
+
   /**
    * One-shot check a few seconds after load. If the scene can't hold a
    * reasonable frame rate, point at the two things that actually fix it.
    */
   private checkPerformance(): void {
-    if (this.perfChecked || !this.scene || this.scene.isFallback) return;
+    const scene = this.sceneToTime;
+    if (!scene) return;
     if (performance.now() - this.loadedAt < 5000) return;
     this.perfChecked = true;
 
     const fps = this.viewer.fps;
     if (fps >= 45) return;
 
-    const { stats } = this.scene;
+    const { stats } = scene;
     const lines = [
       `[perf] ~${fps.toFixed(0)} fps with ${stats.triangles.toLocaleString()} triangles and ~${(
         stats.textureBytes /

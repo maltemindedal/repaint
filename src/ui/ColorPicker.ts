@@ -1,4 +1,4 @@
-import { el } from '../util/dom.ts';
+import { colorEl, el } from '../util/dom.ts';
 import { extractHex, hexToHsv, hsvToHex, normalizeHex, type HSV } from '../util/color.ts';
 import type { LibraryColor } from '../types.ts';
 
@@ -138,9 +138,8 @@ export class ColorPicker {
     }
     for (const entry of library.slice(0, 40)) {
       this.libRow.appendChild(
-        el('button', {
+        colorEl('button', entry.hex, {
           class: 'chip',
-          style: `background:${entry.hex}`,
           title: `${entry.name} · ${entry.hex.toUpperCase()}`,
           onclick: () => this.pick(entry.hex),
         }),

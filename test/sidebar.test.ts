@@ -158,10 +158,10 @@ describe('Sidebar paint list', () => {
   });
 });
 
-describe('Sidebar colour picker', () => {
-  const selected = (hex: string) =>
-    viewModel({ targets: [row('PAINT_North', hex)], selectedKey: 'PAINT_North' });
+const selected = (hex: string) =>
+  viewModel({ targets: [row('PAINT_North', hex)], selectedKey: 'PAINT_North' });
 
+describe('Sidebar colour picker', () => {
   it('opens the picker under the selected row, and moves it with the selection', () => {
     const ui = mount(selected('#111111'));
     expect(ui.paintRow('PAINT_North')!.classList.contains('selected')).toBe(true);
@@ -287,5 +287,55 @@ describe('Sidebar schemes and library', () => {
     must(boxes[1]).checked = true;
     must(boxes[1]).dispatchEvent(new Event('change'));
     expect(ui.cb.onTagChange).toHaveBeenCalledWith('Floor_Oak', true);
+  });
+});
+
+/** Every inline `style` in the tree, joined: what a hostile value must never reach. */
+function styleAttributes(root: HTMLElement): string {
+  return [...root.querySelectorAll('[style]')].map((n) => n.getAttribute('style')).join('\n');
+}
+
+describe('Sidebar colours from saved data', () => {
+  // Library entries and scheme colours come from localStorage or an imported
+  // file, so a value can be anything a string can be.
+  const hostile = 'red;background-image:url(https://tracker.example/p.png)';
+
+  it('paints library swatches and picker chips from valid colours', () => {
+    const ui = mount(
+      viewModel({
+        library: [{ id: 'lib-1', name: 'Chalk', hex: '#f2f0eb' }],
+        targets: [row('PAINT_North', '#111111')],
+        selectedKey: 'PAINT_North',
+      }),
+    );
+    expect(ui.host.querySelector<HTMLElement>('.lib-item .swatch')?.style.backgroundColor).toBe(
+      '#f2f0eb',
+    );
+    expect(ui.host.querySelector<HTMLElement>('.picker-lib .chip')?.style.backgroundColor).toBe(
+      '#f2f0eb',
+    );
+  });
+
+  it('turns no library colour into extra CSS', () => {
+    const ui = mount(
+      viewModel({
+        library: [{ id: 'lib-1', name: 'Evil', hex: hostile }],
+        targets: [row('PAINT_North', '#111111')],
+        selectedKey: 'PAINT_North',
+      }),
+    );
+    expect(styleAttributes(ui.host)).not.toContain('url(');
+  });
+
+  it('turns no scheme colour into extra CSS', () => {
+    const ui = mount(
+      viewModel({
+        schemes: {
+          schemes: [{ id: 'slot-1', name: 'Evil', colors: { PAINT_North: hostile } }],
+          activeId: null,
+        },
+      }),
+    );
+    expect(styleAttributes(ui.host)).not.toContain('url(');
   });
 });

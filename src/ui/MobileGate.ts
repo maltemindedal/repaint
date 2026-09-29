@@ -1,4 +1,5 @@
 import { requireElement } from '../util/dom.ts';
+import { showBootError } from './BootError.ts';
 
 /**
  * Repaint is a mouse-and-keyboard app: picking a wall needs hover, walk mode
@@ -17,13 +18,20 @@ const TOUCH_ONLY = '(pointer: coarse) and (hover: none)';
 const UNLOCK_CLASS = 'app-unlocked';
 const UNLOCK_KEY = 'repaint:allow-mobile';
 
-/** Runs `boot` unless this looks like a phone or a tablet. */
+/**
+ * Runs `boot` unless this looks like a phone or a tablet. If `boot` throws, the
+ * page says why instead of staying blank.
+ */
 export function bootWhenSupported(boot: () => void): void {
   let booted = false;
   const start = (): void => {
     if (booted) return;
     booted = true;
-    boot();
+    try {
+      boot();
+    } catch (err) {
+      showBootError(err);
+    }
   };
 
   if (!isTouchOnly() || wasUnlocked()) {

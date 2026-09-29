@@ -1,4 +1,5 @@
 import type {
+  InstancedMesh,
   Light,
   Material,
   Mesh,
@@ -21,6 +22,10 @@ export function isStandard(m: Material): m is MeshStandardMaterial {
 
 export function isMesh(obj: Object3D): obj is Mesh {
   return (obj as Mesh).isMesh === true;
+}
+
+export function isInstancedMesh(obj: Object3D): obj is InstancedMesh {
+  return (obj as InstancedMesh).isInstancedMesh === true;
 }
 
 export function isLight(obj: Object3D): obj is Light {
