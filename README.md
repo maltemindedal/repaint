@@ -26,7 +26,7 @@ pnpm dev
 ```
 
 ```text
-  VITE v8.2.1  ready in 769 ms
+  VITE v8.3.0  ready in 769 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
