@@ -55,4 +55,4 @@ at the first.
 | Vite           | ^8.3.0            | `package.json`                                                                                         |
 | Vitest         | ^5.0.1            | `package.json`                                                                                         |
 | three.js       | ^0.185.1          | `package.json`                                                                                         |
-| oxlint / oxfmt | ^1.78.0 / ^0.63.0 | `package.json`                                                                                         |
+| oxlint / oxfmt | ^1.85.0 / ^0.70.0 | `package.json`                                                                                         |

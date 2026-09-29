@@ -1,4 +1,4 @@
-import GUI from 'lil-gui';
+import { GUI } from 'lil-gui';
 import Stats from 'stats.js';
 import { EYE_HEIGHT_RANGE } from '../nav/WalkMotion.ts';
 import type { AppliedSettingKey, SceneSettings, SceneStats } from '../types.ts';

@@ -158,10 +158,10 @@ describe('Sidebar paint list', () => {
   });
 });
 
-describe('Sidebar colour picker', () => {
-  const selected = (hex: string) =>
-    viewModel({ targets: [row('PAINT_North', hex)], selectedKey: 'PAINT_North' });
+const selected = (hex: string) =>
+  viewModel({ targets: [row('PAINT_North', hex)], selectedKey: 'PAINT_North' });
 
+describe('Sidebar colour picker', () => {
   it('opens the picker under the selected row, and moves it with the selection', () => {
     const ui = mount(selected('#111111'));
     expect(ui.paintRow('PAINT_North')!.classList.contains('selected')).toBe(true);
