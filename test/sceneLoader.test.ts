@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Scene, type WebGLRenderer } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { LoadSuperseded, SceneLoader } from '../src/core/SceneLoader.ts';
 import type { Viewer } from '../src/core/Viewer.ts';
 import { makeGlb } from './helpers.ts';
@@ -21,6 +22,32 @@ function harness() {
 
 const glbFile = (name: string, json?: Record<string, unknown>) =>
   new File([makeGlb('PAINT_Test', json)], name);
+
+/**
+ * Makes the first parse wait for the returned function, then either run for
+ * real or fail. Every later parse runs normally, so the newer load finishes
+ * while the older one is still held.
+ */
+function holdFirstParse(outcome: 'run' | 'fail') {
+  const realParse = GLTFLoader.prototype.parseAsync;
+  let calls = 0;
+  let openGate: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => {
+    openGate = resolve;
+  });
+  vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(function (
+    this: GLTFLoader,
+    ...args: Parameters<GLTFLoader['parseAsync']>
+  ) {
+    if (++calls > 1) return realParse.apply(this, args);
+    return gate.then(() =>
+      outcome === 'fail'
+        ? Promise.reject(new Error('the older file was not a glTF'))
+        : realParse.apply(this, args),
+    );
+  });
+  return () => openGate?.();
+}
 
 describe('SceneLoader.loadFile', () => {
   // The scene report writes a collapsed console group per load.
@@ -91,10 +118,17 @@ describe('SceneLoader with overlapping requests', () => {
    * flight and finish them in either order.
    */
   const held = new Map<string, () => void>();
+  const progressing = new Map<string, () => void>();
   class HeldReader extends EventTarget {
     result: ArrayBuffer | null = null;
     error: Error | null = null;
     readAsArrayBuffer(file: File): void {
+      // Half of the file has arrived.
+      progressing.set(file.name, () => {
+        this.dispatchEvent(
+          Object.assign(new Event('progress'), { lengthComputable: true, loaded: 1, total: 2 }),
+        );
+      });
       held.set(file.name, () => {
         void file.arrayBuffer().then((buffer) => {
           this.result = buffer;
@@ -114,6 +148,7 @@ describe('SceneLoader with overlapping requests', () => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   afterEach(() => {
     held.clear();
+    progressing.clear();
     vi.unstubAllGlobals();
   });
 
@@ -157,19 +192,24 @@ describe('SceneLoader with overlapping requests', () => {
     expect(scene.children).toEqual([loaded.root]);
   });
 
-  it('stops reporting progress for a load that has been replaced', async () => {
+  it('stops reporting file-read progress for a load that has been replaced', async () => {
     vi.stubGlobal('FileReader', HeldReader);
     const { loader } = harness();
     const olderProgress = vi.fn();
+    const newerProgress = vi.fn();
 
     const older = loader.loadFile(glbFile('older.glb'), olderProgress).catch(() => {});
-    const newer = loader.loadFile(glbFile('newer.glb'));
+    const newer = loader.loadFile(glbFile('newer.glb'), newerProgress);
+    progressing.get('older.glb')?.();
+    progressing.get('newer.glb')?.();
+
+    expect(olderProgress).not.toHaveBeenCalled();
+    expect(newerProgress).toHaveBeenCalledWith(0.25, 'Reading file…');
+
     await release('older.glb');
     await older;
     await release('newer.glb');
     await newer;
-
-    expect(olderProgress).not.toHaveBeenCalled();
   });
 
   it('reports a replaced load as superseded even if its own file was bad', async () => {
@@ -205,5 +245,56 @@ describe('SceneLoader with overlapping requests', () => {
     const err = await result;
     expect(err).toBeInstanceOf(Error);
     expect(err).not.toBeInstanceOf(LoadSuperseded);
+  });
+
+  describe('when the older load is replaced while it is parsing', () => {
+    afterEach(() => vi.mocked(GLTFLoader.prototype.parseAsync).mockRestore());
+
+    it('drops its result after the parse and reports no more progress', async () => {
+      vi.stubGlobal('FileReader', HeldReader);
+      const { scene, loader } = harness();
+      const finishOlderParse = holdFirstParse('run');
+      const olderProgress = vi.fn();
+
+      const older = loader.loadFile(glbFile('older.glb'), olderProgress);
+      const olderResult = older.then(
+        () => 'loaded',
+        (err: unknown) => err,
+      );
+      await release('older.glb'); // read; now waiting inside the parse
+      const newer = loader.loadFile(glbFile('newer.glb'));
+      await release('newer.glb');
+      const loaded = await newer;
+      finishOlderParse();
+
+      expect(await olderResult).toBeInstanceOf(LoadSuperseded);
+      expect(scene.children).toEqual([loaded.root]);
+      // Only what it said while it was still the newest request.
+      expect(olderProgress.mock.calls.map(([, label]) => label)).toEqual(['Parsing glTF…']);
+    });
+
+    it('reports its own failure as superseded, keeping the cause', async () => {
+      vi.stubGlobal('FileReader', HeldReader);
+      const { scene, loader } = harness();
+      const failOlderParse = holdFirstParse('fail');
+
+      const older = loader.loadFile(glbFile('older.glb'));
+      const olderResult = older.then(
+        () => 'loaded',
+        (err: unknown) => err,
+      );
+      await release('older.glb');
+      const newer = loader.loadFile(glbFile('newer.glb'));
+      await release('newer.glb');
+      const loaded = await newer;
+      failOlderParse();
+
+      const err = await olderResult;
+      expect(err).toBeInstanceOf(LoadSuperseded);
+      expect((err as LoadSuperseded).cause).toMatchObject({
+        message: 'the older file was not a glTF',
+      });
+      expect(scene.children).toEqual([loaded.root]);
+    });
   });
 });

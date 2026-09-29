@@ -20,6 +20,16 @@ describe('colorEl', () => {
     expect(colorEl('i', 'red').style.backgroundColor).toBe('red');
   });
 
+  it('ignores a value that only the background shorthand would accept', () => {
+    // Valid in `background: ...` but not a <color>: setting the shorthand instead of
+    // background-color would let these through.
+    for (const value of ['url(https://tracker.example/p.png)', 'linear-gradient(red, blue)']) {
+      const node = colorEl('div', value);
+      expect(node.getAttribute('style') ?? '').not.toMatch(/url\(|gradient/);
+      expect(node.style.backgroundImage).toBe('');
+    }
+  });
+
   it('ignores a value that tries to add further declarations', () => {
     const node = colorEl('div', hostile);
     expect(node.style.backgroundImage).toBe('');

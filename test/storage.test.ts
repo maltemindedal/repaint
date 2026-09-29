@@ -261,6 +261,12 @@ describe('AppStore flush', () => {
     vi.stubGlobal('localStorage', ls);
     const { AppStore, emptyData } = await load();
     const store = new AppStore(emptyData());
+    // The scene entry exists and is saved, so the import queues nothing on its own
+    // (useScene only queues a save for a scene it has to create) and the write can
+    // only come from the import marking the store as changed.
+    store.useScene('__fallback__');
+    store.flush();
+    ls.writes.length = 0;
     const other = new AppStore(emptyData());
     other.addLibraryColor('Chalk', '#f2f0eb');
 
