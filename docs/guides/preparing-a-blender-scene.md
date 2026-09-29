@@ -94,6 +94,11 @@ puts you back where you last stood.
 | **Data → Material → Images**      | `Automatic` (or `JPEG` to shrink lightmaps) |                                                                                               |
 | **Compression (Draco)**           | on for anything big                         | Fully supported. See below.                                                                   |
 
+Repaint reads the one file you drop and never fetches anything on its behalf, so a
+`.gltf` must embed its buffers and textures (Blender's `glTF Embedded`). References
+to other files or to web addresses are refused and fail the way a missing file
+would. `glTF Separate` does not work for that reason, and `.glb` avoids the question.
+
 ## Compression
 
 All three paths are wired up and decode locally. No CDN, works offline: since
