@@ -60,6 +60,8 @@ export class AppStore {
   private data: AppData;
   private sceneKey = '__fallback__';
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Changed since the last save that reached storage. */
+  private dirty = false;
   private saveFailing = false;
 
   /**
@@ -80,6 +82,7 @@ export class AppStore {
    * save is never postponed by a lazy one.
    */
   private queueSave(delay = 250): void {
+    this.dirty = true;
     if (this.saveTimer) {
       if (delay > 250) return; // don't let a lazy save delay an eager one
       clearTimeout(this.saveTimer);
@@ -90,14 +93,21 @@ export class AppStore {
     }, delay);
   }
 
+  /**
+   * Writes any unsaved change now (page hide, import). A tab that changed
+   * nothing writes nothing: its in-memory data is a snapshot from when it
+   * opened, and saving that would overwrite what another tab has stored since.
+   */
   flush(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    this.persist();
+    if (this.dirty) this.persist();
   }
 
   private persist(): void {
     const saved = saveData(this.data);
+    // A save that didn't reach storage stays pending for the next flush.
+    this.dirty = !saved;
     if (!saved && !this.saveFailing) this.onSaveFailed?.();
     this.saveFailing = !saved;
   }
@@ -266,6 +276,7 @@ export class AppStore {
       Object.assign(this.data.scenes, incoming.scenes);
     }
     this.useScene(this.sceneKey);
+    this.dirty = true;
     this.flush();
   }
 }

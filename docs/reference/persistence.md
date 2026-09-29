@@ -61,7 +61,7 @@ Writes are debounced, because dragging a colour picker fires a lot of them.
 | ------------ | ------------------------------------------- |
 | Most changes | 250 ms                                      |
 | Camera poses | 800 ms. They change on every frame you move |
-| `pagehide`   | Immediate flush                             |
+| `pagehide`   | Immediate flush of any unsaved change       |
 
 A pending short-delay save is never postponed by a lazy one. In walk mode the
 pose is only written once the camera has been still for 0.5 s, so walking

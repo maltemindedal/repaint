@@ -162,15 +162,17 @@ describe('AppStore save failures', () => {
     const onSaveFailed = vi.fn();
     store.onSaveFailed = onSaveFailed;
 
+    store.addLibraryColor('Chalk', '#f2f0eb');
     ls.refuseWrites = true;
     store.flush();
-    store.flush();
+    store.flush(); // the failed save is still pending, so this retries it
     expect(onSaveFailed).toHaveBeenCalledTimes(1);
 
     ls.refuseWrites = false;
     store.flush();
     expect(onSaveFailed).toHaveBeenCalledTimes(1);
 
+    store.addLibraryColor('Sage', '#a3b18a');
     ls.refuseWrites = true;
     store.flush();
     expect(onSaveFailed).toHaveBeenCalledTimes(2);
@@ -183,8 +185,103 @@ describe('AppStore save failures', () => {
     const onSaveFailed = vi.fn();
     store.onSaveFailed = onSaveFailed;
 
+    store.addLibraryColor('Chalk', '#f2f0eb');
     store.flush();
 
     expect(onSaveFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('AppStore flush', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    warn.mockRestore();
+  });
+
+  it('writes nothing when there is nothing to save', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, emptyData } = await load();
+
+    new AppStore(emptyData()).flush();
+
+    expect(ls.writes).toEqual([]);
+  });
+
+  it('writes a pending change straight away, and only once', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, emptyData } = await load();
+    const store = new AppStore(emptyData());
+
+    store.addLibraryColor('Chalk', '#f2f0eb');
+    store.flush();
+    vi.advanceTimersByTime(5000);
+
+    expect(ls.writes).toHaveLength(1);
+  });
+
+  it('does not write again on a second flush', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, emptyData } = await load();
+    const store = new AppStore(emptyData());
+
+    store.addLibraryColor('Chalk', '#f2f0eb');
+    store.flush();
+    store.flush();
+
+    expect(ls.writes).toHaveLength(1);
+  });
+
+  it('keeps a change pending when the write failed, and retries it on the next flush', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, emptyData } = await load();
+    const store = new AppStore(emptyData());
+
+    store.addLibraryColor('Chalk', '#f2f0eb');
+    ls.refuseWrites = true;
+    store.flush();
+    ls.refuseWrites = false;
+    store.flush();
+
+    expect(ls.writes).toHaveLength(2);
+    expect(ls.items.size).toBe(1);
+  });
+
+  it('writes an import immediately', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, emptyData } = await load();
+    const store = new AppStore(emptyData());
+    const other = new AppStore(emptyData());
+    other.addLibraryColor('Chalk', '#f2f0eb');
+
+    store.importJSON(other.exportJSON(), 'merge');
+
+    expect(ls.writes).toHaveLength(1);
+    expect(store.library.map((c) => c.name)).toEqual(['Chalk']);
+  });
+
+  it('lets an idle tab close without wiping what another tab saved', async () => {
+    const ls = fakeStorage();
+    vi.stubGlobal('localStorage', ls);
+    const { AppStore, loadData, STORAGE_KEY } = await load();
+    const tabA = new AppStore(loadData());
+    const tabB = new AppStore(loadData()); // opened earlier, never touched
+
+    tabA.addLibraryColor('saved in A', '#123456');
+    tabA.flush();
+    tabB.flush(); // tab B's pagehide
+
+    const stored = JSON.parse(ls.items.get(STORAGE_KEY) ?? '{}') as { library: { name: string }[] };
+    expect(stored.library.map((c) => c.name)).toEqual(['saved in A']);
   });
 });
