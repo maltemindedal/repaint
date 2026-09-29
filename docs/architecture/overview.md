@@ -40,6 +40,7 @@ src/
   util/                    color.ts (sRGB hex helpers), dom.ts
 scripts/
   make-portable.mjs        Folds dist/ into the single-file dist/repaint.html
+  bake_export.py           Headless Blender bake and .glb export (see the baking guide)
 ```
 
 ## How a scene becomes _the_ scene

@@ -95,7 +95,7 @@ def parse_options() -> Options:
                         "bake image is per material); 'single' = one atlas "
                         "for everything")
     p.add_argument("--gpu", action="store_true",
-                   help="try to bake on the GPU (Metal/CUDA/OptiX/HIP)")
+                   help="try to bake on the GPU (Metal/CUDA/OptiX/HIP/oneAPI)")
     p.add_argument("--draco", action="store_true",
                    help="enable Draco compression in the export")
     p.add_argument("--no-lights", action="store_true",

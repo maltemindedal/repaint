@@ -22,7 +22,7 @@ Every script in `package.json`, what it actually runs, and when you want it.
 | Script              | Runs                                                                                      | Notes                                                                         |
 | ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `pnpm check`        | `tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint --deny-warnings && oxfmt --check` | Everything CI's Check job runs, in one command. Use this before pushing.      |
-| `pnpm typecheck`    | `tsc --noEmit`                                                                            |                                                                               |
+| `pnpm typecheck`    | `tsc --noEmit && tsc -p tsconfig.scripts.json`                                            |                                                                               |
 | `pnpm lint`         | `oxlint --deny-warnings`                                                                  | Config in `.oxlintrc.json`. Warnings fail the run, so the tree stays at zero. |
 | `pnpm format`       | `oxfmt`                                                                                   | Formats in place.                                                             |
 | `pnpm format:check` | `oxfmt --check`                                                                           | Fails instead of writing. Config in `.oxfmtrc.json`.                          |

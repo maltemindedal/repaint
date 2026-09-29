@@ -92,7 +92,7 @@ export function pickFile(accept: string): Promise<File | null> {
       resolve(file);
     };
     input.addEventListener('change', () => done(input.files?.[0] ?? null));
-    // `cancel` isn't universally supported; the window focus fallback covers it.
+    // Fires when the picker is dismissed without a choice (Chrome 113+, Firefox 91+, Safari 16.4+).
     input.addEventListener('cancel', () => done(null));
     input.click();
   });

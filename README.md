@@ -103,7 +103,7 @@ Full index: **[docs/README.md](docs/README.md)**
 ```text
 src/          The app: rendering core, navigation, persisted state, plain-DOM UI
 test/         Headless node test suite; fixtures/ generates a sample GLB
-scripts/      make-portable.mjs, which folds dist/ into one HTML file
+scripts/      make-portable.mjs (folds dist/ into one HTML file), bake_export.py (headless Blender bake + export)
 docs/         All documentation (see the index above)
 ```
 
