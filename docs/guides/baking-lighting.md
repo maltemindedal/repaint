@@ -102,6 +102,10 @@ Direct+Indirect with Cycles, and exports the `.glb` with the settings from
 [Preparing a Blender scene](preparing-a-blender-scene.md). The source `.blend`
 is never saved; bake PNGs land in `bakes/` next to the output for inspection.
 
+It has been run end to end on Blender 4.5 LTS, 5.0, 5.1 and 5.2 LTS. The script
+still carries a fallback for Blender 3.x's node-group API that has not been run
+on a current release.
+
 Options after the `--` (also via `-- --help`):
 
 | Flag                | Default       | Meaning                                                                                                                                                                                                                  |
