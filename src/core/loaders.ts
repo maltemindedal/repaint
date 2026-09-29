@@ -1,4 +1,4 @@
-import { LoadingManager, type WebGLRenderer } from 'three';
+import { LoadingManager, type CompressedTexture, type WebGLRenderer } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
@@ -31,11 +31,31 @@ let ktx2: KTX2Loader | null = null;
  */
 const EMBEDDED_URI = /^(?:data|blob):/i;
 
+// `about:blank` cannot be fetched, so a refused resource fails the way a 404 does.
+const embeddedOnly = (url: string): string => (EMBEDDED_URI.test(url) ? url : 'about:blank');
+
 export function embeddedOnlyManager(): LoadingManager {
   const manager = new LoadingManager();
-  // `about:blank` cannot be fetched, so a refused resource fails the way a 404 does.
-  manager.setURLModifier((url) => (EMBEDDED_URI.test(url) ? url : 'about:blank'));
+  manager.setURLModifier(embeddedOnly);
   return manager;
+}
+
+/**
+ * GLTFLoader hands a `KHR_texture_basisu` image straight to KTX2Loader.load(), so
+ * the glTF's own URL for a texture would bypass the manager above. The restriction
+ * cannot simply be a manager on this loader either: it also fetches its own
+ * transcoder through its manager, and that must keep working. So only the URL of
+ * the texture being loaded is checked.
+ */
+export class EmbeddedOnlyKTX2Loader extends KTX2Loader {
+  override load(
+    url: string,
+    onLoad: (texture: CompressedTexture) => void,
+    onProgress?: (event: ProgressEvent) => void,
+    onError?: (error: unknown) => void,
+  ): void {
+    super.load(embeddedOnly(url), onLoad, onProgress, onError);
+  }
 }
 
 export function createGLTFLoader(renderer: WebGLRenderer): GLTFLoader {
@@ -44,7 +64,7 @@ export function createGLTFLoader(renderer: WebGLRenderer): GLTFLoader {
   draco ??= new DRACOLoader();
   loader.setDRACOLoader(draco);
 
-  ktx2 ??= new KTX2Loader();
+  ktx2 ??= new EmbeddedOnlyKTX2Loader();
   // detectSupport needs the live renderer to choose a transcode target
   // (ASTC / ETC / BC / uncompressed fallback) for this GPU.
   ktx2.detectSupport(renderer);

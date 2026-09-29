@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { embeddedOnlyManager } from '../src/core/loaders.ts';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import type { WebGLRenderer } from 'three';
+import { createGLTFLoader, embeddedOnlyManager } from '../src/core/loaders.ts';
 
 /** A one-triangle glTF whose only buffer is `uri`. */
 function triangleGltf(uri: string): string {
@@ -84,5 +86,70 @@ describe('glTF resources cannot make the tab fetch third-party URLs', () => {
     );
     expect(gltf.scene.children).toHaveLength(1);
     expect(fetchedUrls(spy).every((url) => url.startsWith('data:'))).toBe(true);
+  });
+});
+
+/** Replaces `fetch` with one that refuses everything, and returns the spy. */
+function refusingFetch() {
+  const spy = vi.fn(() => Promise.reject(new TypeError('blocked in test')));
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
+describe('createGLTFLoader', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const renderer = {
+    extensions: { has: () => false, get: () => null },
+  } as unknown as WebGLRenderer;
+  it('gives the glTF loader the embedded-only manager', () => {
+    const loader = createGLTFLoader(renderer);
+
+    expect(loader.manager.resolveURL('https://tracker.example/a.png')).toBe('about:blank');
+    expect(loader.manager.resolveURL('blob:http://localhost/1234')).toBe(
+      'blob:http://localhost/1234',
+    );
+  });
+
+  it('control: a stock KTX2Loader fetches the texture URL it is given', () => {
+    const spy = refusingFetch();
+
+    const stock = new KTX2Loader();
+    stock.detectSupport(renderer);
+    stock.load('https://tracker.example/t.ktx2', vi.fn(), undefined, vi.fn());
+
+    expect(fetchedUrls(spy).some((url) => url.includes('tracker.example'))).toBe(true);
+  });
+
+  it('never fetches an external KHR_texture_basisu image', () => {
+    const spy = refusingFetch();
+    const ktx2 = createGLTFLoader(renderer).ktx2Loader;
+
+    ktx2?.load('https://tracker.example/t.ktx2', vi.fn(), undefined, vi.fn());
+    ktx2?.load('//tracker.example/t.ktx2', vi.fn(), undefined, vi.fn());
+    ktx2?.load('textures/t.ktx2', vi.fn(), undefined, vi.fn());
+
+    expect(fetchedUrls(spy).some((url) => url.includes('tracker.example'))).toBe(false);
+  });
+
+  it('still fetches a KTX2 texture that GLTFLoader built as a blob: URL', () => {
+    const spy = refusingFetch();
+
+    createGLTFLoader(renderer).ktx2Loader?.load(
+      'blob:http://localhost/1234',
+      vi.fn(),
+      undefined,
+      vi.fn(),
+    );
+
+    expect(fetchedUrls(spy)).toEqual(['blob:http://localhost/1234']);
+  });
+
+  it('leaves the KTX2 own manager alone, so it can still fetch its transcoder', () => {
+    const ktx2 = createGLTFLoader(renderer).ktx2Loader;
+
+    expect(ktx2?.manager.resolveURL('https://localhost/assets/basis_transcoder.wasm')).toBe(
+      'https://localhost/assets/basis_transcoder.wasm',
+    );
   });
 });
