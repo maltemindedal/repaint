@@ -195,3 +195,23 @@ describe('eye height and the store', () => {
     expect(store.settings.eyeHeight).toBe(EYE_HEIGHT_RANGE.max);
   });
 });
+
+describe('settling', () => {
+  it('is set from the first movement until the stop has been reported', () => {
+    const { motion } = walk();
+    let settled = 0;
+    motion.onPoseSettled = () => settled++;
+    motion.update(1 / 60); // a baseline, not movement
+    expect(motion.settling).toBe(false);
+
+    motion.keys.add('KeyW');
+    for (let i = 0; i < 30; i++) motion.update(1 / 60);
+    expect(motion.settling).toBe(true);
+
+    motion.keys.delete('KeyW');
+    for (let i = 0; i < 600 && motion.settling; i++) motion.update(1 / 60);
+
+    expect(motion.settling).toBe(false);
+    expect(settled).toBe(1);
+  });
+});

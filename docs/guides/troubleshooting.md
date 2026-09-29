@@ -4,7 +4,9 @@ Start with the two built-in diagnostics:
 
 - **The debug panel.** Press <kbd>`</kbd>. Mesh, triangle and texture counts,
   which compression is in use, whether a bake was detected, whether the file has
-  punctual lights, plus a live FPS meter.
+  punctual lights, plus a live FPS meter. While it is open the app draws every
+  frame so the meter means something; normally it draws only when something
+  changes.
 - **The console.** Every load writes a collapsed `[scene]` report with
   dimensions, material and texture counts, compression flags and warnings.
 
@@ -104,8 +106,11 @@ so the occlusion is multiplied in twice. Set **AO intensity** to 0.
 
 ## Performance
 
-Five seconds after a scene loads, if the frame rate is below 45 fps the app logs
-an actionable hint naming the actual cause. It checks, in order:
+The app draws a frame only while something is moving or has just changed, so a
+scene you are not touching costs nothing, and its frame rate is only measured
+while it is measured: for the five seconds after a scene loads, and while the debug
+panel is open. Five seconds after a scene loads, if the frame rate is below 45 fps
+the app logs an actionable hint naming the actual cause. It checks, in order:
 
 | Condition                        | Hint                                                                                    |
 | -------------------------------- | --------------------------------------------------------------------------------------- |

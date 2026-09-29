@@ -6,16 +6,22 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  Timer,
   WebGLRenderer,
   type Texture,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { FrameLoop } from './FrameLoop.ts';
+import { wakeOnInput } from './wakeOnInput.ts';
 
-export type FrameCallback = (dt: number, elapsed: number) => void;
+/** Advances something by `dt` seconds. Returns true while it is still moving. */
+export type FrameCallback = (dt: number, elapsed: number) => boolean;
 
 /**
  * Renderer, camera, scene and the frame loop.
+ *
+ * The loop draws only while something needs a frame (see `FrameLoop`). Whatever
+ * changes the picture from outside the frame callbacks has to call `invalidate`;
+ * every setter here does, and so does user input (see `wakeOnInput`).
  *
  * Colour-management contract:
  *  - `outputColorSpace = SRGBColorSpace` and `ColorManagement` (on by default
@@ -31,13 +37,22 @@ export class Viewer {
   readonly camera: PerspectiveCamera;
   readonly canvas: HTMLCanvasElement;
 
-  private timer = new Timer();
   private callbacks = new Set<FrameCallback>();
-  private rafId = 0;
+  private loop = new FrameLoop({
+    update: (dt, elapsed, resumed) => this.step(dt, elapsed, resumed),
+    draw: () => this.renderer.render(this.scene, this.camera),
+    keepAlive: () => this.keepAlive(),
+  });
   private envTexture: Texture | null = null;
   private capturing: Promise<Blob | null> | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private maxPixelRatio = 2;
+
+  /**
+   * True to draw every frame while it holds: something on screen measures frame
+   * rate, or the frame rate itself is being measured.
+   */
+  keepAlive: () => boolean = () => false;
 
   // Rolling FPS, used by the perf hint and the debug readout.
   private frameTimes: number[] = [];
@@ -71,6 +86,8 @@ export class Viewer {
     // Added after the renderer's own listener, so three has re-initialised its
     // state by the time this runs.
     canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+
+    wakeOnInput(window, canvas, this.invalidate);
 
     this.resize();
     window.addEventListener('resize', this.resize);
@@ -113,10 +130,12 @@ export class Viewer {
     this.envTexture?.dispose();
     this.envTexture = null;
     this.initEnvironment();
+    this.invalidate();
   };
 
   setEnvIntensity(value: number): void {
     this.scene.environmentIntensity = value;
+    this.invalidate();
   }
 
   setBackground(hex: string): void {
@@ -125,17 +144,20 @@ export class Viewer {
     } else {
       this.scene.background = new Color().setStyle(hex, SRGBColorSpace);
     }
+    this.invalidate();
   }
 
   // -------------------------------------------------------- tone mapping
 
   setExposure(value: number): void {
     this.renderer.toneMappingExposure = value;
+    this.invalidate();
   }
 
   setToneMapping(enabled: boolean): void {
     // three notices the change and recompiles affected programs on its own.
     this.renderer.toneMapping = enabled ? ACESFilmicToneMapping : NoToneMapping;
+    this.invalidate();
   }
 
   setMaxPixelRatio(value: number): void {
@@ -152,18 +174,24 @@ export class Viewer {
   }
 
   start(): void {
-    if (this.rafId) return;
-    const tick = (timestamp: number) => {
-      this.rafId = requestAnimationFrame(tick);
-      this.timer.update(timestamp);
-      // Clamp: a background tab produces a huge first delta on return.
-      const dt = Math.min(this.timer.getDelta(), 0.1);
-      const elapsed = this.timer.getElapsed();
-      this.trackFps(dt);
-      for (const fn of this.callbacks) fn(dt, elapsed);
-      this.renderer.render(this.scene, this.camera);
-    };
-    this.rafId = requestAnimationFrame(tick);
+    this.loop.start();
+  }
+
+  /**
+   * The picture is out of date: draw it again. For changes made outside a frame
+   * callback (a colour, a setting, a resize). A frame is only an `update` and a
+   * `draw`, so asking for more than are needed costs almost nothing.
+   */
+  invalidate = (): void => {
+    this.loop.invalidate();
+  };
+
+  private step(dt: number, elapsed: number, resumed: boolean): boolean {
+    // The first frame after a sleep says nothing about how fast frames come.
+    if (!resumed) this.trackFps(dt);
+    let moving = false;
+    for (const fn of this.callbacks) moving = fn(dt, elapsed) || moving;
+    return moving;
   }
 
   private trackFps(dt: number): void {
@@ -188,6 +216,8 @@ export class Viewer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    // Setting the size empties the canvas.
+    this.invalidate();
   };
 
   get size(): { width: number; height: number } {

@@ -147,12 +147,16 @@ class App {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('pagehide', () => this.store.flush());
 
+    // Frames are drawn on demand. These two keep them coming for as long as the
+    // FPS meter is on screen, and while the first seconds of a scene are being timed.
+    this.viewer.keepAlive = () => this.debug.isVisible || this.sceneToTime !== null;
     this.viewer.onFrame((dt) => {
       this.debug.beginFrame();
-      this.nav.update(dt);
-      this.picker.update(dt);
+      const navMoving = this.nav.update(dt);
+      const pickerMoving = this.picker.update(dt);
       this.checkPerformance();
       this.debug.endFrame();
+      return navMoving || pickerMoving;
     });
 
     this.setScene(this.loader.loadFallback());
@@ -328,6 +332,8 @@ class App {
    * can't disagree about which scheme is live.
    */
   private render(): void {
+    // Nearly every mutation ends here, and most of them change the picture.
+    this.viewer.invalidate();
     const vm = sidebarViewModel({
       scene: this.scene,
       registry: this.registry,
@@ -361,6 +367,9 @@ class App {
 
   private applySettings(): void {
     const s = this.store.settings;
+    // Light-map and light settings below change materials and lights the viewer
+    // never hears about.
+    this.viewer.invalidate();
     this.viewer.setExposure(s.exposure);
     this.viewer.setToneMapping(s.toneMapping);
     this.viewer.setEnvIntensity(s.envIntensity);
@@ -599,19 +608,25 @@ class App {
 
   // -------------------------------------------------------- perf & status
 
+  /** The loaded scene, until its frame rate has been judged. Null for the demo room. */
+  private get sceneToTime(): LoadedScene | null {
+    return !this.perfChecked && this.scene && !this.scene.isFallback ? this.scene : null;
+  }
+
   /**
    * One-shot check a few seconds after load. If the scene can't hold a
    * reasonable frame rate, point at the two things that actually fix it.
    */
   private checkPerformance(): void {
-    if (this.perfChecked || !this.scene || this.scene.isFallback) return;
+    const scene = this.sceneToTime;
+    if (!scene) return;
     if (performance.now() - this.loadedAt < 5000) return;
     this.perfChecked = true;
 
     const fps = this.viewer.fps;
     if (fps >= 45) return;
 
-    const { stats } = this.scene;
+    const { stats } = scene;
     const lines = [
       `[perf] ~${fps.toFixed(0)} fps with ${stats.triangles.toLocaleString()} triangles and ~${(
         stats.textureBytes /
