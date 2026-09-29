@@ -53,6 +53,6 @@ at the first.
 | pnpm           | 11.27.1           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
 | TypeScript     | ^5.9.2            | `package.json`                                                                                         |
 | Vite           | ^8.2.1            | `package.json`                                                                                         |
-| Vitest         | ^3.2.4            | `package.json`                                                                                         |
+| Vitest         | ^5.0.1            | `package.json`                                                                                         |
 | three.js       | ^0.185.1          | `package.json`                                                                                         |
 | oxlint / oxfmt | ^1.78.0 / ^0.63.0 | `package.json`                                                                                         |
