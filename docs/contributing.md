@@ -31,8 +31,8 @@ week has to be named deliberately in `minimumReleaseAgeExclude`.
 pnpm check
 ```
 
-That is `tsc --noEmit && oxlint && oxfmt --check`, the same three checks CI runs,
-in one command. Plus:
+That is `tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint --deny-warnings && oxfmt --check`,
+the same checks CI runs, in one command. Plus:
 
 ```bash
 pnpm test

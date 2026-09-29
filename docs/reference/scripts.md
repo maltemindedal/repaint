@@ -19,13 +19,13 @@ Every script in `package.json`, what it actually runs, and when you want it.
 
 ## Quality
 
-| Script              | Runs                                      | Notes                                                                    |
-| ------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| `pnpm check`        | `tsc --noEmit && oxlint && oxfmt --check` | Everything CI's Check job runs, in one command. Use this before pushing. |
-| `pnpm typecheck`    | `tsc --noEmit`                            |                                                                          |
-| `pnpm lint`         | `oxlint`                                  | Config in `.oxlintrc.json`.                                              |
-| `pnpm format`       | `oxfmt`                                   | Formats in place.                                                        |
-| `pnpm format:check` | `oxfmt --check`                           | Fails instead of writing. Config in `.oxfmtrc.json`.                     |
+| Script              | Runs                                                                                      | Notes                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm check`        | `tsc --noEmit && tsc -p tsconfig.scripts.json && oxlint --deny-warnings && oxfmt --check` | Everything CI's Check job runs, in one command. Use this before pushing.      |
+| `pnpm typecheck`    | `tsc --noEmit`                                                                            |                                                                               |
+| `pnpm lint`         | `oxlint --deny-warnings`                                                                  | Config in `.oxlintrc.json`. Warnings fail the run, so the tree stays at zero. |
+| `pnpm format`       | `oxfmt`                                                                                   | Formats in place.                                                             |
+| `pnpm format:check` | `oxfmt --check`                                                                           | Fails instead of writing. Config in `.oxfmtrc.json`.                          |
 
 Unlike `pnpm check`, CI runs the three checks as separate steps guarded with
 `if: ${{ !cancelled() }}`, so one run reports every problem rather than stopping
