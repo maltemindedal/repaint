@@ -14,10 +14,9 @@ pnpm is pinned by the `packageManager` field, so `corepack enable` gets you the
 right version. The exact toolchain versions, and where each is pinned, are the
 table in [reference/scripts.md § Toolchain versions](reference/scripts.md#toolchain-versions).
 
-pnpm blocks dependency build scripts by default. `pnpm-workspace.yaml` allows
-exactly one build script, esbuild's postinstall, which unpacks the platform binary Vite and
-Vitest need. If you add a dependency that needs a build step, it goes there
-deliberately.
+pnpm blocks dependency build scripts by default, and nothing in the tree needs
+one today. If you add a dependency that needs a build step, allow it deliberately
+under `allowBuilds` in `pnpm-workspace.yaml`.
 
 `pnpm-workspace.yaml` also holds two supply-chain guards. `minimumReleaseAge` makes pnpm
 resolve only versions published at least a week ago (installs from the lockfile are
