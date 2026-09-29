@@ -531,24 +531,36 @@ class App {
 
   // ---------------------------------------------------------- screenshot
 
-  private async screenshot(): Promise<void> {
-    const scheme = this.store.schemes.find((s) => s.id === this.store.activeSchemeId);
-    const slug =
-      (scheme?.name ?? 'custom')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '') || 'custom';
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  private screenshotting = false;
 
-    this.panel.status('Rendering 2× screenshot…');
-    const blob = await this.viewer.screenshot(2);
-    if (!blob) {
-      this.panel.status('Screenshot failed. The drawing buffer came back empty.', 4000);
-      return;
+  private async screenshot(): Promise<void> {
+    // A double click or a held key must not start a second capture.
+    if (this.screenshotting) return;
+    this.screenshotting = true;
+    try {
+      const scheme = this.store.schemes.find((s) => s.id === this.store.activeSchemeId);
+      const slug =
+        (scheme?.name ?? 'custom')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'custom';
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+      this.panel.status('Rendering 2× screenshot…');
+      const blob = await this.viewer.screenshot(2);
+      if (!blob) {
+        this.panel.status('Screenshot failed. The drawing buffer came back empty.', 4000);
+        return;
+      }
+      const filename = `repaint_${slug}_${stamp}.png`;
+      downloadBlob(blob, filename);
+      this.panel.status(`Saved ${filename}`, 4000);
+    } catch (err) {
+      console.error('[screenshot] failed', err);
+      this.panel.status('Screenshot failed. See the console for details.', 4000);
+    } finally {
+      this.screenshotting = false;
     }
-    const filename = `repaint_${slug}_${stamp}.png`;
-    downloadBlob(blob, filename);
-    this.panel.status(`Saved ${filename}`, 4000);
   }
 
   // -------------------------------------------------------- import/export

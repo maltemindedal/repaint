@@ -35,6 +35,7 @@ export class Viewer {
   private callbacks = new Set<FrameCallback>();
   private rafId = 0;
   private envTexture: Texture | null = null;
+  private capturing: Promise<Blob | null> | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private maxPixelRatio = 2;
 
@@ -202,24 +203,35 @@ export class Viewer {
   /**
    * Renders one frame at `scale`x the on-screen resolution and returns a PNG
    * blob. Aspect ratio is unchanged, so the framing matches exactly what you
-   * were looking at.
+   * were looking at. Null if the canvas gives no image.
+   *
+   * One capture at a time: a call made while another is running gets that
+   * capture's result. A second capture would read the already-raised pixel ratio
+   * as the one to restore, and leave the renderer stuck at it (4x the pixels)
+   * until reload. The ratio is put back even if rendering throws.
    */
-  async screenshot(scale = 2): Promise<Blob | null> {
+  screenshot(scale = 2): Promise<Blob | null> {
+    this.capturing ??= this.capture(scale).finally(() => {
+      this.capturing = null;
+    });
+    return this.capturing;
+  }
+
+  private async capture(scale: number): Promise<Blob | null> {
     const previousRatio = this.renderer.getPixelRatio();
     const { width, height } = this.size;
-    const wanted = Math.min(previousRatio * scale, 4);
+    try {
+      this.renderer.setPixelRatio(Math.min(previousRatio * scale, 4));
+      this.renderer.setSize(width, height, false);
+      this.renderer.render(this.scene, this.camera);
 
-    this.renderer.setPixelRatio(wanted);
-    this.renderer.setSize(width, height, false);
-    this.renderer.render(this.scene, this.camera);
-
-    const blob = await new Promise<Blob | null>((resolve) => {
-      this.canvas.toBlob((b) => resolve(b), 'image/png');
-    });
-
-    this.renderer.setPixelRatio(previousRatio);
-    this.renderer.setSize(width, height, false);
-    this.renderer.render(this.scene, this.camera);
-    return blob;
+      return await new Promise<Blob | null>((resolve) => {
+        this.canvas.toBlob((b) => resolve(b), 'image/png');
+      });
+    } finally {
+      this.renderer.setPixelRatio(previousRatio);
+      this.renderer.setSize(width, height, false);
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }
