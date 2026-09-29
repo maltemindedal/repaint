@@ -67,6 +67,10 @@ export class Viewer {
     this.camera = new PerspectiveCamera(55, 1, 0.05, 500);
     this.camera.position.set(3, 1.65, 3);
 
+    // Added after the renderer's own listener, so three has re-initialised its
+    // state by the time this runs.
+    canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+
     this.resize();
     window.addEventListener('resize', this.resize);
     if (typeof ResizeObserver !== 'undefined') {
@@ -97,6 +101,18 @@ export class Viewer {
     pmrem.dispose();
     room.dispose();
   }
+
+  /**
+   * After a GPU reset, driver update, sleep/wake or GPU switch three restores
+   * ordinary textures and geometry itself, but a render target's contents are
+   * not recoverable. The environment map is one, so without this every wall is
+   * lit differently (darker, black furniture) until the page is reloaded.
+   */
+  private onContextRestored = (): void => {
+    this.envTexture?.dispose();
+    this.envTexture = null;
+    this.initEnvironment();
+  };
 
   setEnvIntensity(value: number): void {
     this.scene.environmentIntensity = value;
