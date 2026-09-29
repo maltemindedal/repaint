@@ -1,6 +1,6 @@
 import './style.css';
 import { Viewer } from './core/Viewer.ts';
-import { SceneLoader } from './core/SceneLoader.ts';
+import { LoadSuperseded, SceneLoader } from './core/SceneLoader.ts';
 import { PaintRegistry } from './core/PaintRegistry.ts';
 import { PaintController } from './core/PaintController.ts';
 import { Picker } from './core/Picker.ts';
@@ -175,6 +175,7 @@ class App {
     }
 
     this.panel.showLoading(0, 'Reading file…');
+    let replaced = false;
     try {
       const scene = await this.loader.loadFile(file, (fraction, label) =>
         this.panel.showLoading(fraction, label),
@@ -185,6 +186,11 @@ class App {
         5000,
       );
     } catch (err) {
+      if (err instanceof LoadSuperseded) {
+        // A newer request owns the overlay and the scene now.
+        replaced = true;
+        return;
+      }
       console.error('[load] failed', err);
       if (location.protocol === 'file:') {
         console.warn(
@@ -194,7 +200,7 @@ class App {
       }
       this.panel.status(`Could not load ${file.name}. See the console for details.`, 6000);
     } finally {
-      this.panel.hideLoading();
+      if (!replaced) this.panel.hideLoading();
     }
   }
 

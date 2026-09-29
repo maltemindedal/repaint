@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Scene, type WebGLRenderer } from 'three';
-import { SceneLoader } from '../src/core/SceneLoader.ts';
+import { LoadSuperseded, SceneLoader } from '../src/core/SceneLoader.ts';
 import type { Viewer } from '../src/core/Viewer.ts';
 import { makeGlb } from './helpers.ts';
 
@@ -82,5 +82,128 @@ describe('SceneLoader.loadFile', () => {
 
     expect(scene.children).toEqual([first.root]);
     expect(first.root.parent).toBe(scene);
+  });
+});
+
+describe('SceneLoader with overlapping requests', () => {
+  /**
+   * A FileReader that finishes only when the test says so, to put two loads in
+   * flight and finish them in either order.
+   */
+  const held = new Map<string, () => void>();
+  class HeldReader extends EventTarget {
+    result: ArrayBuffer | null = null;
+    error: Error | null = null;
+    readAsArrayBuffer(file: File): void {
+      held.set(file.name, () => {
+        void file.arrayBuffer().then((buffer) => {
+          this.result = buffer;
+          this.dispatchEvent(new Event('load'));
+        });
+      });
+    }
+  }
+  const release = async (name: string) => {
+    held.get(name)?.();
+    // Let the read, the parse and the continuation run.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  };
+
+  vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+  vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  afterEach(() => {
+    held.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the file requested last even when an older one finishes after it', async () => {
+    vi.stubGlobal('FileReader', HeldReader);
+    const { scene, loader } = harness();
+
+    const older = loader.loadFile(glbFile('older.glb'));
+    const newer = loader.loadFile(glbFile('newer.glb'));
+    const olderResult = older.then(
+      () => 'loaded',
+      (err: unknown) => err,
+    );
+
+    await release('newer.glb');
+    const loaded = await newer;
+    await release('older.glb');
+
+    expect(await olderResult).toBeInstanceOf(LoadSuperseded);
+    expect(scene.children).toEqual([loaded.root]);
+    expect(loaded.label).toBe('newer.glb');
+  });
+
+  it('drops the older file when it finishes first, too', async () => {
+    vi.stubGlobal('FileReader', HeldReader);
+    const { scene, loader } = harness();
+
+    const older = loader.loadFile(glbFile('older.glb'));
+    const newer = loader.loadFile(glbFile('newer.glb'));
+    const olderResult = older.then(
+      () => 'loaded',
+      (err: unknown) => err,
+    );
+
+    await release('older.glb');
+    expect(await olderResult).toBeInstanceOf(LoadSuperseded);
+    expect(scene.children).toEqual([]);
+
+    await release('newer.glb');
+    const loaded = await newer;
+    expect(scene.children).toEqual([loaded.root]);
+  });
+
+  it('stops reporting progress for a load that has been replaced', async () => {
+    vi.stubGlobal('FileReader', HeldReader);
+    const { loader } = harness();
+    const olderProgress = vi.fn();
+
+    const older = loader.loadFile(glbFile('older.glb'), olderProgress).catch(() => {});
+    const newer = loader.loadFile(glbFile('newer.glb'));
+    await release('older.glb');
+    await older;
+    await release('newer.glb');
+    await newer;
+
+    expect(olderProgress).not.toHaveBeenCalled();
+  });
+
+  it('reports a replaced load as superseded even if its own file was bad', async () => {
+    vi.stubGlobal('FileReader', HeldReader);
+    const { loader } = harness();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const older = loader.loadFile(new File(['not a model'], 'older.glb'));
+    const newer = loader.loadFile(glbFile('newer.glb'));
+    const olderResult = older.then(
+      () => 'loaded',
+      (err: unknown) => err,
+    );
+
+    await release('older.glb');
+    expect(await olderResult).toBeInstanceOf(LoadSuperseded);
+    await release('newer.glb');
+    await newer;
+  });
+
+  it('still reports a real failure for the newest load', async () => {
+    vi.stubGlobal('FileReader', HeldReader);
+    const { loader } = harness();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const only = loader.loadFile(new File(['not a model'], 'only.glb'));
+    const result = only.then(
+      () => 'loaded',
+      (err: unknown) => err,
+    );
+    await release('only.glb');
+
+    const err = await result;
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(LoadSuperseded);
   });
 });

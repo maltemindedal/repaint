@@ -9,6 +9,17 @@ import type { Viewer } from './Viewer.ts';
 
 export type ProgressFn = (fraction: number, label: string) => void;
 
+/**
+ * Thrown by `loadFile` when a newer request has replaced it. Its result was
+ * going to be thrown away, so this is not a failure to show the user.
+ */
+export class LoadSuperseded extends Error {
+  constructor(file: File, options?: ErrorOptions) {
+    super(`${file.name} was replaced by a newer load`, options);
+    this.name = 'LoadSuperseded';
+  }
+}
+
 /** Frees every GPU resource under a subtree. */
 export function disposeSubtree(root: Object3D): void {
   const textures = new Set<Texture>();
@@ -49,6 +60,8 @@ function readFile(file: File, onProgress: ProgressFn): Promise<ArrayBuffer> {
 
 export class SceneLoader {
   private current: Object3D | null = null;
+  /** Counts `loadFile` calls; only the latest one may touch the viewer. */
+  private generation = 0;
 
   constructor(private viewer: Viewer) {}
 
@@ -76,54 +89,78 @@ export class SceneLoader {
     };
   }
 
+  /**
+   * Latest request wins. Two files can be in flight at once (a drop while one is
+   * still loading, or Open twice) and finish in either order; without this the
+   * older one could land last and replace the file the user asked for most
+   * recently. A replaced load throws `LoadSuperseded` and, from that point,
+   * neither reports progress nor changes the scene.
+   */
   async loadFile(file: File, onProgress: ProgressFn = () => {}): Promise<LoadedScene> {
-    const buffer = await readFile(file, onProgress);
-    onProgress(0.55, 'Parsing glTF…');
-
-    const loader = createGLTFLoader(this.viewer.renderer);
-    const gltf: GLTF = await loader.parseAsync(buffer, '');
-
-    onProgress(0.85, 'Preparing materials…');
-
-    // `gltf.scene` is typed as always present, but a glTF with no `scenes` array
-    // is valid JSON and parses to `undefined`.
-    const root: Object3D | undefined = gltf.scene ?? gltf.scenes[0];
-    if (!root) throw new Error(`${file.name} contains no scene`);
-    root.name = root.name || file.name;
-    // Everything that can throw happens here, on the detached root, so a bad file
-    // leaves the scene on screen (and the UI describing it) untouched.
-    const processed = processScene(root);
-    const used = new Set(
-      ((gltf.parser.json as { extensionsUsed?: string[] }).extensionsUsed ?? []).map(String),
-    );
-
-    this.unload();
-    this.viewer.scene.add(root);
-    this.current = root;
-
-    const scene: LoadedScene = {
-      root,
-      key: file.name,
-      label: file.name,
-      bounds: processed.bounds,
-      lights: processed.lights,
-      startCam: processed.startCam,
-      startCamFov: processed.startCamFov,
-      bakedMaterials: processed.bakedMaterials,
-      aoOnlyMaterials: processed.aoOnlyMaterials,
-      hasBakedTextures: processed.bakedMaterials.length > 0,
-      stats: {
-        ...processed.stats,
-        draco: used.has('KHR_draco_mesh_compression'),
-        meshopt: used.has('EXT_meshopt_compression'),
-        ktx2: used.has('KHR_texture_basisu'),
-      },
-      isFallback: false,
+    const generation = ++this.generation;
+    const stale = () => generation !== this.generation;
+    const progress: ProgressFn = (fraction, label) => {
+      if (!stale()) onProgress(fraction, label);
     };
 
-    onProgress(1, 'Done');
-    logSceneReport(scene, file);
-    return scene;
+    try {
+      const buffer = await readFile(file, progress);
+      if (stale()) throw new LoadSuperseded(file);
+      progress(0.55, 'Parsing glTF…');
+
+      const loader = createGLTFLoader(this.viewer.renderer);
+      const gltf: GLTF = await loader.parseAsync(buffer, '');
+      if (stale()) throw new LoadSuperseded(file);
+
+      // Nothing below awaits, so no other request can slip in before the swap.
+      progress(0.85, 'Preparing materials…');
+
+      // `gltf.scene` is typed as always present, but a glTF with no `scenes` array
+      // is valid JSON and parses to `undefined`.
+      const root: Object3D | undefined = gltf.scene ?? gltf.scenes[0];
+      if (!root) throw new Error(`${file.name} contains no scene`);
+      root.name = root.name || file.name;
+      // Everything that can throw happens here, on the detached root, so a bad file
+      // leaves the scene on screen (and the UI describing it) untouched.
+      const processed = processScene(root);
+      const used = new Set(
+        ((gltf.parser.json as { extensionsUsed?: string[] }).extensionsUsed ?? []).map(String),
+      );
+
+      this.unload();
+      this.viewer.scene.add(root);
+      this.current = root;
+
+      const scene: LoadedScene = {
+        root,
+        key: file.name,
+        label: file.name,
+        bounds: processed.bounds,
+        lights: processed.lights,
+        startCam: processed.startCam,
+        startCamFov: processed.startCamFov,
+        bakedMaterials: processed.bakedMaterials,
+        aoOnlyMaterials: processed.aoOnlyMaterials,
+        hasBakedTextures: processed.bakedMaterials.length > 0,
+        stats: {
+          ...processed.stats,
+          draco: used.has('KHR_draco_mesh_compression'),
+          meshopt: used.has('EXT_meshopt_compression'),
+          ktx2: used.has('KHR_texture_basisu'),
+        },
+        isFallback: false,
+      };
+
+      progress(1, 'Done');
+      logSceneReport(scene, file);
+      return scene;
+    } catch (err) {
+      // Whatever a replaced load ran into no longer matters.
+      if (stale() && !(err instanceof LoadSuperseded)) {
+        throw new LoadSuperseded(file, { cause: err });
+      }
+      throw err;
+    }
   }
 
   unload(): void {
