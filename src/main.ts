@@ -133,10 +133,14 @@ class App {
     this.nav.onPoseChange = (mode, pose) => this.store.setPose(mode, pose);
     this.nav.walk.onEyeHeightChange = (value) => this.storeEyeHeight(value);
 
+    // Deferred a microtask: an import saves immediately, and the "Imported ..." toast
+    // its caller shows in the same tick would otherwise replace this, which is said only once.
     this.store.onSaveFailed = () =>
-      this.panel.status(
-        'Your changes could not be saved (browser storage is full or blocked) and will be lost when this tab closes.',
-        10000,
+      queueMicrotask(() =>
+        this.panel.status(
+          'Your changes could not be saved (browser storage is full or blocked) and will be lost when this tab closes.',
+          10000,
+        ),
       );
 
     window.addEventListener('keydown', this.onKeyDown);
