@@ -6,11 +6,11 @@ an export ready.
 
 ## Prerequisites
 
-| Tool    | Version                                  | Notes                                                                                                       |
-| ------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Node    | 24.x                                     | What CI runs and the app is developed against (`.github/workflows/ci.yml`). No `engines` field enforces it. |
-| pnpm    | 11.27.1                                  | Pinned by the `packageManager` field in `package.json`. `corepack enable` picks it up automatically.        |
-| Browser | Any current desktop browser with WebGL 2 | Touch-only devices get a "use a desktop" page instead. See [the gate](#a-note-on-phones-and-tablets).       |
+| Tool    | Version                                  | Notes                                                                                                                |
+| ------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Node    | ^22.13, ^24 or 26+                       | The range in `engines` (`package.json`); CI runs and the app is developed against 24.x (`.github/workflows/ci.yml`). |
+| pnpm    | 11.27.1                                  | Pinned by the `packageManager` field in `package.json`. `corepack enable` picks it up automatically.                 |
+| Browser | Any current desktop browser with WebGL 2 | Touch-only devices get a "use a desktop" page instead. See [the gate](#a-note-on-phones-and-tablets).                |
 
 ## 1. Install and run
 

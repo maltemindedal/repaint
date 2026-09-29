@@ -15,7 +15,8 @@ permissions:
   contents: read
 
 env:
-  # Node's current Active LTS, and what the app is developed against.
+  # The Node the app is developed and tested against. `engines` in package.json
+  # holds the wider range that is supported; `@types/node` follows this major.
   NODE_VERSION: '24.x'
 
 jobs:

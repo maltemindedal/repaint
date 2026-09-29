@@ -14,7 +14,7 @@ machine. No backend, uploads, or analytics are involved. Your GLB is read with
 
 ## Quick start
 
-Requires **Node 24.x** and **pnpm 11.27.1** (pinned by `packageManager`; run
+Requires **Node ^22.13, ^24 or 26+** (CI and development use 24.x) and **pnpm 11.27.1** (pinned by `packageManager`; run
 `corepack enable`).
 
 ```bash

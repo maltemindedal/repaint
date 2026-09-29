@@ -47,12 +47,12 @@ at the first.
 
 ## Toolchain versions
 
-| Tool           | Version           | Pinned by                                                                                              |
-| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
-| Node           | 24.x              | `NODE_VERSION` in `.github/workflows/ci.yml`. No `engines` field enforces it locally.                  |
-| pnpm           | 11.27.1           | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately. |
-| TypeScript     | ^7.0.2            | `package.json`                                                                                         |
-| Vite           | ^8.3.0            | `package.json`                                                                                         |
-| Vitest         | ^5.0.1            | `package.json`                                                                                         |
-| three.js       | ^0.185.1          | `package.json`                                                                                         |
-| oxlint / oxfmt | ^1.85.0 / ^0.70.0 | `package.json`                                                                                         |
+| Tool           | Version                   | Pinned by                                                                                                               |
+| -------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Node           | ^22.13 \|\| ^24 \|\| >=26 | `engines` in `package.json`. CI runs 24.x (`NODE_VERSION` in `.github/workflows/ci.yml`), and `@types/node` follows it. |
+| pnpm           | 11.27.1                   | `packageManager` in `package.json`. CI reads the version from there rather than pinning it separately.                  |
+| TypeScript     | ^7.0.2                    | `package.json`                                                                                                          |
+| Vite           | ^8.3.0                    | `package.json`                                                                                                          |
+| Vitest         | ^5.0.1                    | `package.json`                                                                                                          |
+| three.js       | ^0.185.1                  | `package.json`                                                                                                          |
+| oxlint / oxfmt | ^1.85.0 / ^0.70.0         | `package.json`                                                                                                          |
