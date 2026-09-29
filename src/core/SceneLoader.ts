@@ -84,18 +84,22 @@ export class SceneLoader {
     const gltf: GLTF = await loader.parseAsync(buffer, '');
 
     onProgress(0.85, 'Preparing materials…');
-    this.unload();
 
-    const root = gltf.scene ?? gltf.scenes[0];
+    // `gltf.scene` is typed as always present, but a glTF with no `scenes` array
+    // is valid JSON and parses to `undefined`.
+    const root: Object3D | undefined = gltf.scene ?? gltf.scenes[0];
+    if (!root) throw new Error(`${file.name} contains no scene`);
     root.name = root.name || file.name;
+    // Everything that can throw happens here, on the detached root, so a bad file
+    // leaves the scene on screen (and the UI describing it) untouched.
     const processed = processScene(root);
-
-    this.viewer.scene.add(root);
-    this.current = root;
-
     const used = new Set(
       ((gltf.parser.json as { extensionsUsed?: string[] }).extensionsUsed ?? []).map(String),
     );
+
+    this.unload();
+    this.viewer.scene.add(root);
+    this.current = root;
 
     const scene: LoadedScene = {
       root,
