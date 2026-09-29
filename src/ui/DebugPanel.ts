@@ -1,5 +1,5 @@
 import { GUI } from 'lil-gui';
-import Stats from 'stats.js';
+import Stats from 'three/addons/libs/stats.module.js';
 import { EYE_HEIGHT_RANGE } from '../nav/WalkMotion.ts';
 import type { AppliedSettingKey, SceneSettings, SceneStats } from '../types.ts';
 
@@ -21,7 +21,7 @@ export interface DebugHooks {
 const MB = 1024 * 1024;
 
 /**
- * lil-gui panel + stats.js meter, hidden behind the backtick key.
+ * lil-gui panel + fps meter, hidden behind the backtick key.
  *
  * Every control here changes how the scene *looks*, so it stays out of the way
  * by default. The point of the app is judging colour, not fiddling with

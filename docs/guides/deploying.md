@@ -78,10 +78,10 @@ console warning pointing at `pnpm serve:dist`.
 - **Users on phones and tablets** get a "use a desktop" page rather than a broken
   app.
 - **Redistribution is MIT**, both for `dist/` and for the portable
-  `dist/repaint.html`, including the bundled three.js, lil-gui, and stats.js,
-  which are MIT as well. The licence asks that the copyright notice travel with
-  substantial copies, so ship [LICENSE](../../LICENSE) alongside a build you pass
-  on, or paste it into the page you host it from.
+  `dist/repaint.html`, including the bundled three.js (with its fps meter) and
+  lil-gui, which are MIT as well. The licence asks that the copyright notice
+  travel with substantial copies, so ship [LICENSE](../../LICENSE) alongside a
+  build you pass on, or paste it into the page you host it from.
 
 ## Continuous integration
 

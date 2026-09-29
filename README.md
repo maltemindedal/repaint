@@ -122,5 +122,6 @@ MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Malte Mindedal.
 
 `package.json` stays `"private": true` so the package is never published to npm
 by accident; that flag says nothing about the licence, which is MIT for the source
-and the docs alike. The runtime dependencies, three.js, lil-gui, and stats.js,
-are MIT too, so a `dist/` or `dist/repaint.html` build carries only MIT code.
+and the docs alike. The runtime dependencies, three.js and lil-gui, are MIT too
+(the fps meter is the copy of stats.js that ships inside three.js), so a `dist/`
+or `dist/repaint.html` build carries only MIT code.
