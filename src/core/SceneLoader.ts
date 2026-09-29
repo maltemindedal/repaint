@@ -1,7 +1,7 @@
 import { Object3D, Vector3, type Texture } from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { createGLTFLoader } from './loaders.ts';
-import { isMesh, isTexture, materialsOf } from './materials.ts';
+import { isInstancedMesh, isMesh, isTexture, materialsOf } from './materials.ts';
 import { processScene } from './processScene.ts';
 import { createFallbackScene, FALLBACK_KEY, FALLBACK_LABEL } from './fallbackScene.ts';
 import type { LoadedScene } from '../types.ts';
@@ -25,6 +25,9 @@ export function disposeSubtree(root: Object3D): void {
   const textures = new Set<Texture>();
   root.traverse((obj) => {
     if (!isMesh(obj)) return;
+    // The renderer frees an instanced mesh's matrix/colour buffers from the
+    // mesh's own dispose event; disposing its geometry and materials never fires it.
+    if (isInstancedMesh(obj)) obj.dispose();
     obj.geometry?.dispose();
     for (const mat of materialsOf(obj)) {
       if (!mat) continue;
