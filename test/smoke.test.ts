@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { must } from './helpers.ts';
 import {
   DataTexture,
@@ -150,6 +150,47 @@ describe('colour pipeline', () => {
     expect(target.currentHex).toBe('#e8e4da');
     // The value that actually reaches the GPU must read back as the same sRGB hex.
     expect(must(target.materials[0]).color.getHexString(SRGBColorSpace)).toBe('e8e4da');
+  });
+
+  it('accepts any colour three can parse, not just hex', () => {
+    const { registry } = buildScene();
+    const target = registry.get('PAINT_Living_North')!;
+
+    expect(registry.setColor(target.key, 'red')).toBe(true);
+    expect(target.currentHex).toBe('#ff0000');
+    expect(registry.setColor(target.key, '#0f0')).toBe(true);
+    expect(target.currentHex).toBe('#00ff00');
+  });
+
+  it('refuses a colour it cannot parse instead of repeating the previous wall colour', () => {
+    const { registry } = buildScene();
+    const north = registry.get('PAINT_Living_North')!;
+    const east = registry.get('PAINT_Living_East')!;
+    const eastBefore = east.currentHex;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Leaves a colour behind in the registry's scratch value for the next call.
+    registry.setColor(north.key, '#ff0000');
+    for (const bad of ['banana', 'E8E4DA', '', 'red;background-image:url(x)']) {
+      expect(registry.setColor(east.key, bad)).toBe(false);
+      expect(east.currentHex).toBe(eastBefore);
+      expect(must(east.materials[0]).color.getHexString(SRGBColorSpace)).toBe(eastBefore.slice(1));
+    }
+    warn.mockRestore();
+  });
+
+  it('skips unparseable scheme colours and counts only what it painted', () => {
+    const { registry } = buildScene();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const applied = registry.applyScheme({
+      PAINT_Living_North: 'banana',
+      PAINT_Living_East: '#00ff00',
+    });
+
+    expect(applied).toBe(1);
+    expect(registry.get('PAINT_Living_East')!.currentHex).toBe('#00ff00');
+    warn.mockRestore();
   });
 
   it('never invalidates the shader program on a colour change', () => {
