@@ -79,6 +79,31 @@
       </div>
     </div>
 
+    <!--
+      Shown instead of everything else when the app cannot start, most often
+      because the browser would not create a WebGL 2 context. Kept in the HTML
+      because nothing else has been built by then. See src/ui/BootError.ts.
+    -->
+    <div id="boot-error" role="alert">
+      <div class="gate-card">
+        <svg class="gate-icon" viewBox="0 0 48 32" aria-hidden="true">
+          <rect x="1" y="1" width="34" height="24" rx="2.5" />
+          <path d="M12 31h12M18 25v6" />
+          <path d="M9 9l18 10M27 9L9 19" />
+        </svg>
+
+        <h1>Repaint could not start</h1>
+        <p class="gate-lede">
+          It draws the apartment with WebGL 2, and this browser did not provide it. Check that
+          hardware acceleration is switched on in the browser's settings and that your graphics
+          driver is up to date, then reload the page.
+        </p>
+
+        <p class="gate-foot">What the browser reported:</p>
+        <div id="boot-error-detail" class="gate-url"></div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

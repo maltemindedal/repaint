@@ -22,6 +22,15 @@ pnpm serve:dist
 Or build the double-clickable single file with `pnpm build:portable`. See
 [Deploying](deploying.md#the-portable-single-file-build).
 
+### "Repaint could not start"
+
+The app draws with WebGL 2 and the browser would not create a context. The page
+shows what the browser reported, and the console has the full error under
+`[boot] failed`. The usual causes are hardware acceleration switched off in the
+browser's settings, a GPU or driver on the browser's blocklist, and remote-desktop
+or virtual-machine sessions without a GPU. Turn hardware acceleration on, update
+the graphics driver, and reload.
+
 ### A compressed `.glb` fails to load from the portable file
 
 Draco and KTX2 files cannot decode on `file://`; the app logs a warning when it
