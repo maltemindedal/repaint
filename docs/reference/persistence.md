@@ -113,8 +113,10 @@ checked on the way in rather than blind-cast (`migrate()` in
 `src/state/storage.ts`). Anything that doesn't hold its shape is dropped, never
 propagated:
 
-- Scheme entries need a string `id` and `name`; colour maps keep only string
-  values.
+- Scheme entries need a string `id` and `name`. Colours (in colour maps and the
+  library) must be `#rgb` or `#rrggbb`, and are kept as written; anything else
+  (`red`, `rgb(…)`, a bare `e8e4da`, or a string carrying extra CSS) is dropped.
+  The app itself only ever writes `#rrggbb`, so only a hand-edited file is affected.
 - Poses need `position` and `target` as three finite numbers each, or the mode is
   dropped.
 - Settings keep only known keys whose values have the expected type. A finite

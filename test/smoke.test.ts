@@ -391,6 +391,47 @@ describe('persistence', () => {
     expect(store.settings.aoMapIntensity).toBe(0);
   });
 
+  it('keeps only #rgb and #rrggbb colours, exactly as written', () => {
+    const injection = 'red;background-image:url(https://tracker.example/p.png)';
+    const data = migrate({
+      version: 1,
+      library: [
+        { id: 'a', name: 'Upper', hex: '#F2F0EB' },
+        { id: 'b', name: 'Bare', hex: 'F2F0EB' },
+        { id: 'c', name: 'Named', hex: 'red' },
+        { id: 'd', name: 'Evil', hex: injection },
+        { id: 'e', name: 'Short', hex: '#abc' },
+        { id: 'f', name: 'Four', hex: '#abcd' },
+        { id: 'g', name: 'NotHex', hex: '#ggg' },
+        { id: 'h', name: 'Padded', hex: ' #abc ' },
+      ],
+      scenes: {
+        'x.glb': {
+          schemes: [
+            {
+              id: 'slot-1',
+              name: 'S',
+              colors: { PAINT_A: injection, PAINT_B: '#fff', PAINT_C: 'red', PAINT_D: 'e8e4da' },
+            },
+          ],
+          current: { PAINT_A: 'url(https://tracker.example/p.png)', PAINT_B: '#E8E4DA' },
+        },
+      },
+    });
+
+    expect(data.library.map((c) => c.hex)).toEqual(['#F2F0EB', '#abc']);
+    const scene = must(data.scenes['x.glb']);
+    expect(must(scene.schemes[0]).colors).toEqual({ PAINT_B: '#fff' });
+    expect(scene.current).toEqual({ PAINT_B: '#E8E4DA' });
+  });
+
+  it('does not touch Object.prototype for a __proto__ scene key', () => {
+    const data = migrate(JSON.parse('{"version":1,"scenes":{"__proto__":{"polluted":true}}}'));
+
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(Object.keys(data.scenes)).toEqual([]);
+  });
+
   it('repairs library entries that share an id, so removing one keeps the other', () => {
     const data = migrate({
       version: 1,

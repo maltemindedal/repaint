@@ -7,6 +7,16 @@
 
 const HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+const STRICT_HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/**
+ * True for exactly `#rgb` or `#rrggbb`, the only forms the app ever writes. Stricter
+ * than `normalizeHex`, which also takes a bare `e8e4da` and surrounding spaces.
+ */
+export function isHexColor(value: string): boolean {
+  return STRICT_HEX_RE.test(value);
+}
+
 /** Normalises `e8e4da`, `#E8E4DA`, `#eda` -> `#e8e4da`. Returns null if invalid. */
 export function normalizeHex(input: string): string | null {
   const m = HEX_RE.exec(input.trim());

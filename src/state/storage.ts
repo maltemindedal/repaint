@@ -1,4 +1,5 @@
 import type { AppData } from '../types.ts';
+import { isHexColor } from '../util/color.ts';
 
 // Historical key from before the app was renamed to Repaint. Keep it so
 // existing saved schemes and libraries survive the rename.
@@ -78,11 +79,12 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
-function stringRecord(value: unknown): Record<string, string> {
+/** A material name -> colour map. Colours are kept as written, but only if they are `#rgb` or `#rrggbb`. */
+function colorRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(value)) {
-    if (typeof v === 'string') out[k] = v;
+    if (typeof v === 'string' && isHexColor(v)) out[k] = v;
   }
   return out;
 }
@@ -96,7 +98,7 @@ function schemeList(value: unknown): AppData['scenes'][string]['schemes'] {
     const id = s['id'];
     const name = s['name'];
     if (typeof id !== 'string' || typeof name !== 'string') continue;
-    out.push({ id, name, colors: stringRecord(s['colors']) });
+    out.push({ id, name, colors: colorRecord(s['colors']) });
   }
   return out;
 }
@@ -159,7 +161,7 @@ export function migrate(input: unknown): AppData {
     // import could write such data; the first holder keeps its id.
     const taken = new Set<string>();
     data.library = raw.library
-      .filter((c) => c && typeof c.hex === 'string')
+      .filter((c) => c && typeof c.hex === 'string' && isHexColor(c.hex))
       .map((c, i) => {
         const wanted = typeof c.id === 'string' ? c.id : `lib-${i}-${c.hex}`;
         let id = wanted;
@@ -181,7 +183,7 @@ export function migrate(input: unknown): AppData {
         activeSchemeId: typeof activeSchemeId === 'string' ? activeSchemeId : null,
         poses: poseMap(p['poses']),
         settings: settingsPatch(p['settings']),
-        current: stringRecord(p['current']),
+        current: colorRecord(p['current']),
       };
     }
   }
