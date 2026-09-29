@@ -1,4 +1,4 @@
-import { el } from '../util/dom.ts';
+import { colorEl, el } from '../util/dom.ts';
 
 /**
  * The tiny stacked colour strip shown on scheme slots, shared by the toolbar
@@ -8,7 +8,7 @@ import { el } from '../util/dom.ts';
 export function miniSwatches(hexes: string[], max: number): HTMLElement {
   const strip = el('div', { class: 'mini-swatches' });
   const shown = hexes.slice(0, max);
-  for (const hex of shown) strip.appendChild(el('i', { style: `background:${hex}` }));
+  for (const hex of shown) strip.appendChild(colorEl('i', hex));
   if (shown.length === 0) strip.appendChild(el('i', { style: 'background:#3a3a3a' }));
   return strip;
 }

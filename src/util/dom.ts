@@ -26,6 +26,22 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/**
+ * `el()` filled with a colour. The colour is set through the CSSOM, which takes
+ * exactly one `<color>`. Interpolating it into a `style` attribute instead would
+ * let an imported or hand-edited value carry more declarations with it
+ * (`red;background-image:url(https://…)`), and the browser would honour them.
+ */
+export function colorEl<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  color: string,
+  attrs: Attrs = {},
+): HTMLElementTagNameMap[K] {
+  const node = el(tag, attrs);
+  node.style.backgroundColor = color;
+  return node;
+}
+
 export function clear(node: HTMLElement): void {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
