@@ -11,7 +11,6 @@ import {
   type Texture,
 } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { isMesh, materialsOf } from './materials.ts';
 
 export type FrameCallback = (dt: number, elapsed: number) => void;
 
@@ -36,7 +35,6 @@ export class Viewer {
   private callbacks = new Set<FrameCallback>();
   private rafId = 0;
   private envTexture: Texture | null = null;
-  private pmrem: PMREMGenerator | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private maxPixelRatio = 2;
 
@@ -88,17 +86,16 @@ export class Viewer {
    */
   initEnvironment(): void {
     if (this.envTexture) return;
-    this.pmrem = new PMREMGenerator(this.renderer);
-    this.pmrem.compileEquirectangularShader();
+    const pmrem = new PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
-    const target = this.pmrem.fromScene(room, 0.04);
+    const target = pmrem.fromScene(room, 0.04);
     this.envTexture = target.texture;
     this.scene.environment = this.envTexture;
-    room.traverse((obj) => {
-      if (!isMesh(obj)) return;
-      obj.geometry.dispose();
-      for (const mat of materialsOf(obj)) mat.dispose();
-    });
+    // Only the finished texture is kept. The generator's ping-pong target and
+    // blur/convolution programs, and the room's geometry and materials, are not
+    // needed again, so give them back.
+    pmrem.dispose();
+    room.dispose();
   }
 
   setEnvIntensity(value: number): void {
